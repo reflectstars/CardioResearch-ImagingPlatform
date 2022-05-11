@@ -1,0 +1,3 @@
+
+PATH=@MITK_RUNTIME_PATH@;%PATH%
+@VS_BUILD_TYPE@\CemrgApp.exe
