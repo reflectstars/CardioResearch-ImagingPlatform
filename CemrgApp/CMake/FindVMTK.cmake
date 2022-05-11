@@ -98,4 +98,6 @@ endif()
 #   )
 # endif()
 #
-# mark_as_adva
+# mark_as_advanced(
+#   VMTK_INCLUDE_DIR
+# )
