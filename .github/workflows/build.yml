@@ -82,4 +82,90 @@ jobs:
         sudo DEBIAN_FRONTEND=noninteractive apt install libxt-dev libtiff5-dev libfontconfig1 mesa-common-dev libglu1-mesa-dev libxcomposite1 libxcursor1 libxrender1 libxi6 libxtst6 libasound2 libnspr4 libnss3 libxkbcommon-dev libxkbcommon-x11-dev doxygen git cmake python3-pip gcc-6 g++-6 -y
         sudo apt remove --auto-remove icu-devtools libicu-dev -y
     
-    - name: Ins
+    - name: Install Qt
+      run: |
+        sudo pip3 install --upgrade setuptools
+        sudo pip3 install aqtinstall
+        sudo aqt install --outputdir /Qt 5.12.10 linux desktop -m qtcharts qtnetworkauth qtpurchasing qtdatavis3d qtscript qtvirtualkeyboard qtwebengine qtwebglplugin
+    
+    - name: Clone MITK
+      run: sudo git clone --branch v2018.04.2 https://phabricator.mitk.org/source/mitk.git /MITK
+    
+    - name: Change timestamps of MITK directory
+      run: sudo find /MITK/ -exec touch -a -m -d 20210401 {} \;
+
+    - name: Clone CemrgApp
+      uses: actions/checkout@v2
+      with:
+        path: CemrgApp
+
+    - name: Move CemrgApp to root
+      run: sudo mv CemrgApp /
+
+    - name: Update the CemrgApp version
+      working-directory: /CemrgApp
+      run: |
+        sudo rm CemrgApp/Applications/MainApp/version.txt
+        sudo echo ${{ needs.Variables.outputs.tag }} >> CemrgApp/Applications/MainApp/version.txt
+        sudo echo ${{ needs.Variables.outputs.sha }} >> CemrgApp/Applications/MainApp/version.txt
+
+    - name: Build
+      working-directory: /Build
+      run: make -j4
+
+    - name: Package
+      working-directory: /Build/MITK-build
+      run: |
+        make package -j4
+        cd _CPack_Packages/Linux/TGZ
+        mv MITK-v2018.04.2-linux-x86_64 CemrgApp-Linux
+        rm CemrgApp-Linux/Mitk*
+        rm CemrgApp-Linux/bin/MitkWorkbench*
+        mv /Externals/* CemrgApp-Linux/bin/
+        mv /CemrgApp/README.md CemrgApp-Linux/
+        7z a CemrgApp-Linux.zip CemrgApp-Linux
+        mv CemrgApp-Linux.zip ${{ github.workspace }}/
+
+    - name: Upload package
+      uses: actions/upload-artifact@v2
+      with:
+        name: Packages
+        path: CemrgApp-Linux.zip
+
+
+  Build-Windows:
+    runs-on: windows-2016
+    needs: [Variables]
+    steps:
+    - name: Uninstall NSIS
+      run: |
+        & 'C:/Program Files (x86)/NSIS/uninst-nsis.exe' /S
+      
+    - name: Download precompiled Build folder
+      working-directory: c:\
+      run: |
+        c:\msys64\usr\bin\wget.exe -q -O Build.zip https://emckclac-my.sharepoint.com/:u:/g/personal/k2143219_kcl_ac_uk/EUFa_AWPBI1OnnQwXA_ilu8Bq38U6OjiR4XKDcxDKo5wnw?download=1
+        7z x Build.zip
+        del Build.zip
+
+    - name: Download external libraries
+      working-directory: c:\
+      run: |
+        c:\msys64\usr\bin\wget.exe -q -O Externals.zip https://emckclac-my.sharepoint.com/:u:/g/personal/k2143219_kcl_ac_uk/Ea8urj-xMS5CoEnt3lS-A9QBLoAi1EXfP3lM26MRn11OrA?download=1
+        7z x Externals.zip
+        del Externals.zip
+    
+    - name: Install Qt
+      working-directory: c:\
+      run: |
+        pip install aqtinstall
+        mkdir Qt
+        python -m aqt install --outputdir Qt 5.12.10 windows desktop win64_msvc2017_64 -m qtcharts qtnetworkauth qtpurchasing qtdatavis3d qtscript qtvirtualkeyboard qtwebengine qtwebglplugin
+    
+    - name: Clone MITK
+      run: git clone --branch v2018.04.2 https://phabricator.mitk.org/source/mitk.git c:\MITK
+    
+    - name: Change timestamps of MITK directory
+      run: dir -R c:\MITK | foreach { $_.LastWriteTime = [DateTime]::ParseExact('01-04-21', 'dd-MM-yy', $null) }
+    
+    
