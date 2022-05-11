@@ -168,4 +168,92 @@ jobs:
     - name: Change timestamps of MITK directory
       run: dir -R c:\MITK | foreach { $_.LastWriteTime = [DateTime]::ParseExact('01-04-21', 'dd-MM-yy', $null) }
     
+    - name: Clone CemrgApp
+      uses: actions/checkout@v2
+      with:
+        path: CemrgApp
     
+    - name: Copy CemrgApp to root
+      shell: cmd
+      run: |
+        mkdir c:\CemrgApp
+        xcopy /e .\CemrgApp\* c:\CemrgApp\
+        rd /s /q CemrgApp
+
+    - name: Update the CemrgApp version
+      working-directory: c:\CemrgApp
+      shell: powershell
+      run: |
+        rm CemrgApp/Applications/MainApp/version.txt
+        echo ${{ needs.Variables.outputs.tag }} >> CemrgApp/Applications/MainApp/version.txt
+        echo ${{ needs.Variables.outputs.sha }} >> CemrgApp/Applications/MainApp/version.txt
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.2
+
+    - name: Build
+      working-directory: c:\Build
+      run: MSBuild MITK-superbuild.sln /p:Configuration=Release /p:Platform=x64 -m:4
+
+    - name: Package
+      working-directory: c:\Build\MITK-build
+      run: |
+        MSBuild PACKAGE.vcxproj /p:Configuration=Release /p:Platform=x64 -m:4
+        cd _CPack_Packages\win64\ZIP
+        ren MITK-v2018.04.2-windows-x86_64 CemrgApp-Windows
+        xcopy /e c:\Externals\* .\CemrgApp-Windows\bin\
+        copy c:\CemrgApp\README.md .\CemrgApp-Windows\
+        del CemrgApp-Windows\bin\MitkWorkbench.*
+        7z a CemrgApp-Windows.zip CemrgApp-Windows
+        move CemrgApp-Windows.zip ${{ github.workspace }}\
+
+    - name: Upload package
+      uses: actions/upload-artifact@v2
+      with:
+        name: Packages
+        path: CemrgApp-Windows.zip
+  
+
+  Build-macOS:
+    runs-on: macos-10.15
+    needs: [Variables]
+    steps:
+    - name: Download precompiled Build folder
+      working-directory: /Users/Shared
+      run: |
+        wget -q -O Build.zip https://emckclac-my.sharepoint.com/:u:/g/personal/k2143219_kcl_ac_uk/EVzkObB3qiZLpEQsCLB3pdcBjaGDuzLapXFvujnDP_xr1A?download=1
+        7z x Build.zip
+        rm Build.zip
+
+    - name: Download external libraries
+      working-directory: /Users/Shared
+      run: |
+        wget -q -O Externals.zip https://emckclac-my.sharepoint.com/:u:/g/personal/k2143219_kcl_ac_uk/EZh5YUHzdyNEu_m0ZwTfaYUBZBil9eIqLrmJw8lDWQSLag?download=1
+        7z x Externals.zip
+        rm Externals.zip
+
+    - name: Download patch for MITK
+      working-directory: /Users/Shared
+      run: |
+        wget -q -O Patch.zip https://emckclac-my.sharepoint.com/:u:/g/personal/k2143219_kcl_ac_uk/EQ5LKrqH_fZNt9eGA7RBcC4B9YyyF0SwFeo9hIm9zkqLTQ?download=1
+        7z x Patch.zip
+        rm Patch.zip
+
+    - name: Install missing packages
+      run: brew install gmp doxygen llvm@9
+
+    - name: Install Qt
+      working-directory: /Users/Shared
+      run: |
+        pip3 install aqtinstall --user
+        mkdir Qt
+        python3 -m aqt install --outputdir Qt 5.12.10 mac desktop -m qtcharts qtnetworkauth qtpurchasing qtdatavis3d qtscript qtvirtualkeyboard qtwebengine qtwebglplugin
+
+    - name: Clone MITK
+      run: git clone --branch v2018.04.2 https://phabricator.mitk.org/source/mitk.git /Users/Shared/MITK
+      
+    - name: Patch MITK
+      working-directory: /Users/Shared
+      run: |
+        cp Patch/usServiceListeners.cpp MITK/Modules/CppMicroServices/core/src/service/usServiceListeners.cpp
+        cp Patch/usListenerFunctors_p.h MITK/Modules/CppMicroServices
