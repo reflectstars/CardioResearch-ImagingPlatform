@@ -1,0 +1,4 @@
+
+coverage:
+  ignore:
+    - "CemrgApp/Modules/CemrgAppModule/test"
