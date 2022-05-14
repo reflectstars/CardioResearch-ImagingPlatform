@@ -339,4 +339,45 @@ ImFilterType::Pointer imdilate(ImageType::Pointer input, uint8_t radius, QString
 ImMultiplyType::Pointer immultiply(ImageType::Pointer input1, ImageType::Pointer input2, QString debugOutput, bool debugging) {
     ImMultiplyType::Pointer imMultiplication = ImMultiplyType::New();
     imMultiplication->SetInput1(input1);
-    imMultipl
+    imMultiplication->SetInput2(input2);
+
+    if (debugging) {
+        mitk::IOUtil::Save(mitk::ImportItkImage(imMultiplication->GetOutput()), debugOutput.toStdString());
+    }
+
+    return imMultiplication;
+}
+
+void relabel(ImageType::Pointer & imageToRelabel, ImageType::Pointer imageFragment, uint8_t fromLabel, uint8_t toLabel) {
+    IteratorType relabelIter(imageToRelabel, imageToRelabel->GetLargestPossibleRegion());
+    IteratorType condIter(imageFragment, imageFragment->GetLargestPossibleRegion());
+
+    while (!relabelIter.IsAtEnd()) {
+        if (condIter.Get() == fromLabel) { //label LV=1, change for RV=5
+            relabelIter.Set(toLabel);
+        }
+        ++relabelIter;
+        ++condIter;
+    }
+}
+
+// ResampleImageFilterType::Pointer & imresize(ImageType::Pointer imToResize, ImageType::Pointer imTarget){
+//     ResampleImageFilterType::Pointer resampler = ResampleImageFilterType::New();
+//     NNInterpolatorType::Pointer nninterp = NNInterpolatorType::New();
+//
+//     resampler->SetInput(imToResize);
+//     resampler->SetInterpolator(nninterp);
+//     resampler->SetOutputOrigin(imTarget->GetOrigin());
+//     ImageType::SizeType input_size = imTarget->GetLargestPossibleRegion().GetSize();
+//     ImageType::SpacingType input_spacing = imTarget->GetSpacing();
+//
+//     resampler->SetSize(input_size);
+//     resampler->SetOutputSpacing(input_spacing);
+//     resampler->SetOutputDirection(imTarget->GetDirection());
+//     resampler->UpdateLargestPossibleRegion();
+//
+//     if(debug){
+//         QString step1 = debugPrefix + "S1_resizedBloodPool.nii";
+//         mitk::IOUtil::Save(mitk::ImportItkImage(resampler->GetOutput()), step1.toStdString());
+//     }
+// }
