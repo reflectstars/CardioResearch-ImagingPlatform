@@ -91,4 +91,47 @@ int main(int argc, char* argv[]) {
 
     try {
         // Code the functionality of the cmd app here.
-        if (verbose) 
+        if (verbose) {
+            MITK_INFO << "Verbose mode ON. Calculating registration.";
+            MITK_INFO << "Input 1:" << input1;
+            MITK_INFO << "Input 2:" << input2;
+        }
+        std::unique_ptr<QProcess> process(new QProcess());
+        aPath = QCoreApplication::applicationDirPath() + "/MLib";
+        process->setProcessChannelMode(QProcess::MergedChannels);
+        process->setWorkingDirectory(aPath);
+
+        QString INPUT1(input1.c_str());
+        QString INPUT2(input2.c_str());
+
+        //Setup registration
+        QStringList arguments;
+        QFileInfo fileinfo(INPUT1);
+
+        QString dir = fileinfo.path();
+        QString output = dir + "/rigid.dof";
+        QString mirtk = aPath + "/register";
+
+        MITK_INFO(verbose) << "OUTPUT VALUE: " << output.toStdString();
+
+        arguments << INPUT1;
+        arguments << INPUT2;
+        arguments << "-dofout" << output;
+        arguments << "-model" << "Rigid";
+        arguments << "-verbose" << "3";
+
+        MITK_INFO(verbose) << "Running command:" << mirtk.toStdString() << std::endl;
+        process->start(mirtk, arguments);
+        MITK_INFO(verbose) << "EXIT CODE: " << process->exitCode();
+        MITK_INFO(verbose) << "Finished working. Output in file:\n\t" << output.toStdString() << std::endl;
+        MITK_INFO(verbose) << "Closing Process" << std::endl;
+        process->close();
+
+    } catch (const std::exception &e) {
+        MITK_ERROR << e.what();
+        return EXIT_FAILURE;
+    } catch (...) {
+        MITK_ERROR << "Unexpected error";
+        return EXIT_FAILURE;
+    }
+}
