@@ -267,4 +267,76 @@ int main(int argc, char* argv[]) {
             ThresholdType::Pointer thresRV = thresholdImage(resampler->GetOutput(), bpRightV, step2, debug);
 
             MITK_INFO << "Dilating selected blooodpool.";
- 
+            // Image dilation on thresholded image
+            QString step3 = debugPrefix + "S3_dilatedRV.nii";
+            ImFilterType::Pointer dilateFilter = imdilate(thresRV->GetOutput(), 1.0, step3, debug);
+
+            MITK_INFO << "Extracting bloodpool from input image";
+            // Multiply input image to thresholed bloodpool (imageFragment)
+            QString step4 = debugPrefix + "S4-1_extractedSegmentLV.nii";
+            ImMultiplyType::Pointer imMultLV = immultiply(itkInput, thresLV->GetOutput(), step4, debug);
+
+            step4 = debugPrefix + "S4-2_extractedSegmentRV.nii";
+            ImMultiplyType::Pointer imMultRV = immultiply(itkInput, dilateFilter->GetOutput(), step4, debug);
+
+            MITK_INFO << "Relabel specific volume in original.";
+            QString swapLabelsStr = QString::fromStdString(swaplabels);
+            QStringList swapLabelsList = swapLabelsStr.split(QLatin1Char(','));
+
+            uint8_t fromLabel = uint8_t(swapLabelsList.at(0).toInt());
+            uint8_t toLabel = uint8_t(swapLabelsList.at(1).toInt());
+
+            relabel(itkInput, imMultLV->GetOutput(), toLabel, fromLabel);
+            relabel(itkInput, imMultRV->GetOutput(), fromLabel, toLabel);
+
+            mitk::IOUtil::Save(mitk::ImportItkImage(itkInput), outputPath.toStdString());
+
+        }
+
+        MITK_INFO(verbose) << "Goodbye!";
+    } catch (const std::exception &e) {
+        MITK_ERROR << e.what();
+        return EXIT_FAILURE;
+    } catch (...) {
+        MITK_ERROR << "Unexpected error";
+        return EXIT_FAILURE;
+    }
+}
+
+ThresholdType::Pointer thresholdImage(ImageType::Pointer input, uint8_t thresholdVal, QString debugOutput, bool debugging) {
+    ThresholdType::Pointer thresholdOutput = ThresholdType::New();
+    thresholdOutput->SetInput(input);
+    thresholdOutput->SetLowerThreshold(thresholdVal);
+    thresholdOutput->SetUpperThreshold(thresholdVal);
+    thresholdOutput->SetInsideValue(1);
+    thresholdOutput->SetOutsideValue(0);
+    thresholdOutput->Update();
+
+    if (debugging) {
+        mitk::IOUtil::Save(mitk::ImportItkImage(thresholdOutput->GetOutput()), debugOutput.toStdString());
+    }
+
+    return thresholdOutput;
+}
+
+ImFilterType::Pointer imdilate(ImageType::Pointer input, uint8_t radius, QString debugOutput, bool debugging) {
+    StrElType structuringElement;
+    structuringElement.SetRadius(static_cast<unsigned long>(radius));
+    structuringElement.CreateStructuringElement();
+
+    ImFilterType::Pointer imDilateFilter = ImFilterType::New();
+    imDilateFilter->SetInput(input);
+    imDilateFilter->SetKernel(structuringElement);
+    imDilateFilter->SetDilateValue(1); // same as threshold's insideValue
+
+    if (debugging) {
+        mitk::IOUtil::Save(mitk::ImportItkImage(imDilateFilter->GetOutput()), debugOutput.toStdString());
+    }
+
+    return imDilateFilter;
+}
+
+ImMultiplyType::Pointer immultiply(ImageType::Pointer input1, ImageType::Pointer input2, QString debugOutput, bool debugging) {
+    ImMultiplyType::Pointer imMultiplication = ImMultiplyType::New();
+    imMultiplication->SetInput1(input1);
+    imMultipl
