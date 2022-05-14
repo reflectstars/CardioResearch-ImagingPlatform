@@ -199,4 +199,72 @@ int main(int argc, char* argv[]) {
         // PARSING ARGUMENTS
         QString inname = QString::fromStdString(inFilename);
         QString bloodpname = QString::fromStdString(bloodFilename);
-        QString outname = QString::fromStdStr
+        QString outname = QString::fromStdString(outFilename);
+
+        if (!outname.contains(".nii", Qt::CaseSensitive))
+            outname = outname + ".nii";
+
+        MITK_INFO(verbose) << "Obtaining input file path and working directory: ";
+
+        // OBTAINING directory and inputPath variables
+        QFileInfo fi(inname);
+        QFileInfo bpfi(bloodpname);
+
+        QString path = fi.absolutePath() + "/";
+        QString inputPath = fi.absoluteFilePath();
+        QString bpPath = bpfi.absoluteFilePath();
+        QString outputPath = path + outname;
+        QString debugPrefix = path + "DEBUG_";
+
+        mitk::Point3D origin;
+
+        MITK_INFO << ("INPUT SEGMENTATION: " + inputPath).toStdString();
+        MITK_INFO << ("OUTPUT: " + outputPath).toStdString();
+        MITK_INFO(debug) << ("DEBUG PREFIX: " + debugPrefix).toStdString();
+
+        MITK_INFO(verbose) << "Loading Image.";
+        mitk::Image::Pointer image = mitk::IOUtil::Load<mitk::Image>(inputPath.toStdString());
+        mitk::Image::Pointer bp = mitk::IOUtil::Load<mitk::Image>(bpPath.toStdString());
+
+        if (image && bp) {
+
+            MITK_INFO << "Resize bloodpool to image size";
+            ImageType::Pointer itkInput = ImageType::New();
+            ImageType::Pointer itkBp = ImageType::New();
+
+            mitk::CastToItkImage(image, itkInput);
+            mitk::CastToItkImage(bp, itkBp);
+
+            ResampleImageFilterType::Pointer resampler = ResampleImageFilterType::New();
+            NNInterpolatorType::Pointer nninterp = NNInterpolatorType::New();
+
+            resampler->SetInput(itkBp);
+            resampler->SetInterpolator(nninterp);
+            resampler->SetOutputOrigin(itkInput->GetOrigin());
+            ImageType::SizeType input_size = itkInput->GetLargestPossibleRegion().GetSize();
+            ImageType::SpacingType input_spacing = itkInput->GetSpacing();
+
+            resampler->SetSize(input_size);
+            resampler->SetOutputSpacing(input_spacing);
+            resampler->SetOutputDirection(itkInput->GetDirection());
+            resampler->UpdateLargestPossibleRegion();
+
+            if (debug) {
+                QString step1 = debugPrefix + "S1_resizedBloodPool.nii";
+                mitk::IOUtil::Save(mitk::ImportItkImage(resampler->GetOutput()), step1.toStdString());
+            }
+
+            MITK_INFO << "Select left ventricle with bloodpool-label";
+            // threshold
+            uint8_t bpLeftV = uint8_t(std::stoi(bp_lv));
+            QString step2 = debugPrefix + "S2-1_thresholdedLV.nii";
+            ThresholdType::Pointer thresLV = thresholdImage(resampler->GetOutput(), bpLeftV, step2, debug);
+
+            MITK_INFO << "Select right ventricle with bloodpool-label";
+            // threshold
+            uint8_t bpRightV = uint8_t(std::stoi(bp_rv));
+            step2 = debugPrefix + "S2-2_thresholdedRV.nii";
+            ThresholdType::Pointer thresRV = thresholdImage(resampler->GetOutput(), bpRightV, step2, debug);
+
+            MITK_INFO << "Dilating selected blooodpool.";
+ 
