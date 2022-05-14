@@ -153,4 +153,79 @@ int main(int argc, char* argv[]) {
 
     MITK_INFO << "Program starting...";
     try {
-        // Code the functio
+        // Code the functionality of the cmd app here.
+        MITK_INFO(verbose) << "Verbose mode ON.";
+
+        int method = thresmethod;
+        QString methodPref = (method == 2) ? "MplusSD_" : "IIR_";
+        MITK_INFO(method == 1) << "IIR METHOD";
+        MITK_INFO(method == 2) << "M + SD METHOD";
+
+        // PARSING ARGUMENTS
+        QString lgename = QString::fromStdString(inFilename2);
+        QString segvtk = "segmentation.vtk";
+        QString outname = methodPref + "MaxScar";
+        outname += singlevoxelprojection ? "-single-voxel" : "-repeated-voxels";
+        outname += ".vtk";
+
+        MITK_INFO(verbose) << "Obtaining input file path and working directory: ";
+
+        // OBTAINING directory and lgepath variables
+        QFileInfo fi(lgename);
+        QString direct = fi.absolutePath();
+        QString lgePath = fi.absoluteFilePath();
+        QString outputFolder = direct + "/" + fi.baseName() + "_OUTPUT" + "/";
+
+        QDir d(outputFolder);
+
+        if (!d.exists(outputFolder)) {
+            MITK_INFO(d.mkpath(outputFolder)) << "Output folder created";
+        }
+
+        typedef itk::Image<short, 3> ImageTypeCHAR;
+        typedef itk::Image<short, 3> ImageTypeSHRT;
+
+        //Scar projection
+        MITK_INFO(verbose) << "Performing Scar projection.";
+
+        int minStep = -1;
+        int maxStep = 3;
+        int methodType = 2;
+        std::unique_ptr<CemrgScar3D> scar(new CemrgScar3D());
+        scar->SetMinStep(minStep);
+        scar->SetMaxStep(maxStep);
+        scar->SetMethodType(methodType);
+
+        MITK_INFO(singlevoxelprojection) << "Setting Single voxel projection";
+        MITK_INFO(!singlevoxelprojection) << "Setting multiple voxels projection";
+        scar->SetVoxelBasedProjection(singlevoxelprojection);
+
+        ImageTypeCHAR::Pointer segITK = ImageTypeCHAR::New();
+        ImageTypeSHRT::Pointer lgeITK = ImageTypeSHRT::New();
+
+        mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>((direct + "/PVeinsCroppedImage.nii").toStdString()), segITK);
+        mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(lgePath.toStdString()), lgeITK);
+
+        itk::ResampleImageFilter<ImageTypeCHAR, ImageTypeCHAR>::Pointer resampleFilter;
+        resampleFilter = itk::ResampleImageFilter<ImageTypeCHAR, ImageTypeCHAR>::New();
+        resampleFilter->SetInput(segITK);
+        resampleFilter->SetReferenceImage(lgeITK);
+        resampleFilter->SetUseReferenceImage(true);
+        resampleFilter->SetInterpolator(itk::NearestNeighborInterpolateImageFunction<ImageTypeCHAR>::New());
+        resampleFilter->SetDefaultPixelValue(0);
+        resampleFilter->UpdateLargestPossibleRegion();
+        segITK = resampleFilter->GetOutput();
+        mitk::IOUtil::Save(mitk::ImportItkImage(segITK), (direct + "/PVeinsCroppedImage.nii").toStdString());
+        scar->SetScarSegImage(mitk::ImportItkImage(segITK));
+
+        //Thresholding
+        int vxls = 3;
+        // int threshType = 1;
+
+        typedef itk::Image<float, 3> ImageType;
+        typedef itk::BinaryBallStructuringElement<ImageTypeCHAR::PixelType, 3> BallType;
+        typedef itk::GrayscaleErodeImageFilter<ImageTypeCHAR, ImageType, BallType> ErosionFilterType;
+
+        BallType binaryBall;
+        binaryBall.SetRadius(vxls);
+        binaryBall.CreateStructuringEle
