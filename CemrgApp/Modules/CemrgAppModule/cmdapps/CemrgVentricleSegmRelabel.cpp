@@ -121,4 +121,82 @@ int main(int argc, char* argv[]) {
     parser.addArgument(
         "bloodpool", "b", mitkCommandLineParser::InputFile,
         "Input image bloodpool seg", "Full path of bloodpool file.",
-    
+        us::Any(), false);
+    parser.addArgument( // optional
+        "bp-rv", "rv", mitkCommandLineParser::String,
+        "Bloodpool segmentation label (RV)", "RV segmentation label (default=30)");
+    parser.addArgument( // optional
+        "bp-lv", "lv", mitkCommandLineParser::String,
+        "Bloodpool segmentation label (LV)", "LV segmentation label (default=10)");
+    parser.addArgument( // optional
+        "swap-labels", "sl", mitkCommandLineParser::String,
+        "Swap levels code", "Code to swap labels (syntax: 'N,M' , default:1,5)");
+    parser.addArgument(// optional
+        "output", "o", mitkCommandLineParser::String,
+        "Output file name", "Where to save the output (default: output.nii).");
+    parser.addArgument( // optional
+        "debug", "d", mitkCommandLineParser::Bool,
+        "Debug Outputs", "Save intermediate steps of processing.");
+    parser.addArgument( // optional
+        "verbose", "v", mitkCommandLineParser::Bool,
+        "Verbose Output", "Whether to produce verbose output");
+
+    // Parse arguments.
+    // This method returns a mapping of long argument names to their values.
+    auto parsedArgs = parser.parseArguments(argc, argv);
+
+    if (parsedArgs.empty())
+        return EXIT_FAILURE;
+
+    if (parsedArgs["input"].Empty() || parsedArgs["bloodpool"].Empty()) {
+        MITK_INFO << parser.helpText();
+        return EXIT_FAILURE;
+    }
+
+    // Parse, cast and set required arguments
+    auto inFilename = us::any_cast<std::string>(parsedArgs["input"]);
+    auto bloodFilename = us::any_cast<std::string>(parsedArgs["bloodpool"]);
+    // auto outFilename = us::any_cast<std::string>(parsedArgs["output"]);
+
+    // Default values for optional arguments
+    auto verbose = false;
+    auto debug = false;
+    std::string bp_rv = "30";
+    std::string bp_lv = "10";
+    std::string swaplabels = "1,5";
+    std::string outFilename = "output.nii";
+
+    // Parse, cast and set optional arguments
+    if (parsedArgs.end() != parsedArgs.find("verbose")) {
+        verbose = us::any_cast<bool>(parsedArgs["verbose"]);
+    }
+
+    if (parsedArgs.end() != parsedArgs.find("bp-rv")) {
+        bp_rv = us::any_cast<std::string>(parsedArgs["bp-rv"]);
+    }
+
+    if (parsedArgs.end() != parsedArgs.find("bp-lv")) {
+        bp_lv = us::any_cast<std::string>(parsedArgs["bp-lv"]);
+    }
+
+    if (parsedArgs.end() != parsedArgs.find("swap-labels")) {
+        swaplabels = us::any_cast<std::string>(parsedArgs["swap-labels"]);
+    }
+
+    if (parsedArgs.end() != parsedArgs.find("output")) {
+        outFilename = us::any_cast<std::string>(parsedArgs["output"]);
+    }
+
+    if (parsedArgs.end() != parsedArgs.find("debug")) {
+        debug = us::any_cast<bool>(parsedArgs["debug"]);
+    }
+
+
+    try {
+        // Code the functionality of the cmd app here.
+        MITK_INFO(verbose) << "Verbose mode ON.";
+
+        // PARSING ARGUMENTS
+        QString inname = QString::fromStdString(inFilename);
+        QString bloodpname = QString::fromStdString(bloodFilename);
+        QString outname = QString::fromStdStr
