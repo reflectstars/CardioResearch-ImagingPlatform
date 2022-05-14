@@ -228,4 +228,68 @@ int main(int argc, char* argv[]) {
 
         BallType binaryBall;
         binaryBall.SetRadius(vxls);
-        binaryBall.CreateStructuringEle
+        binaryBall.CreateStructuringElement();
+        ErosionFilterType::Pointer erosionFilter = ErosionFilterType::New();
+        erosionFilter->SetInput(segITK);
+        erosionFilter->SetKernel(binaryBall);
+        erosionFilter->UpdateLargestPossibleRegion();
+        mitk::Image::Pointer roiImage = mitk::Image::New();
+        roiImage = mitk::ImportItkImage(erosionFilter->GetOutput())->Clone();
+
+        ImageType::Pointer lgeFloat = ImageType::New();
+        mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(lgePath.toStdString()), lgeFloat);
+
+        double mean = 0.0, stdv = 0.0;
+        scar->CalculateMeanStd(mitk::ImportItkImage(lgeFloat), roiImage, mean, stdv);
+
+        MITK_INFO(verbose) << "Performing Scar projection using " + segvtk.toStdString();
+
+        QString prodPath = direct + "/";
+        mitk::Surface::Pointer scarShell = scar->Scar3D(direct.toStdString(), mitk::ImportItkImage(lgeITK));
+
+        MITK_INFO(verbose) << "Saving new scar map to " + outname.toStdString();
+
+        mitk::IOUtil::Save(scarShell, (outputFolder + outname).toStdString());
+        scar->SaveNormalisedScalars(mean, scarShell, outputFolder + "Normalised_" + outname);
+
+        QFileInfo fi2(outputFolder + outname);
+        QString prothresfile = fi2.baseName() + "_prodStats.txt";
+
+        MITK_INFO(verbose) << "Writing to pordStats file" + prothresfile.toStdString();
+        ofstream prodFile1;
+        prodFile1.open((outputFolder + prothresfile).toStdString());
+        prodFile1 << methodPref.toStdString() << std::endl;
+        prodFile1 << mean << std::endl;
+        prodFile1 << stdv << std::endl;
+
+        if (multithreshold) {
+            MITK_INFO << "Scores for multiple thresholds.";
+            prodFile1 << "MULTIPLE SCORES:" << std::endl;
+            double startVal, endVal, increment;
+
+            startVal = (method == 2) ? 1.0 : 0.7;
+            endVal = (method == 2) ? 5.0 : 1.61;
+            increment = (method == 2) ? 0.1 : 0.01;
+
+            double thisVal = startVal;
+            while (thisVal <= endVal) {
+                double thisthres = (method == 2) ? mean + thisVal * stdv : mean * thisVal;
+                double thispercentage = scar->Thresholding(thisthres);
+                prodFile1 << "V=" << thisVal << ", SCORE=" << thispercentage << std::endl;
+
+                thisVal += increment;
+            }
+        }
+
+        prodFile1.close();
+
+
+        MITK_INFO(verbose) << "Goodbye!";
+    } catch (const std::exception &e) {
+        MITK_ERROR << e.what();
+        return EXIT_FAILURE;
+    } catch (...) {
+        MITK_ERROR << "Unexpected error";
+        return EXIT_FAILURE;
+    }
+}
