@@ -183,4 +183,24 @@ public:
     std::string PrintScarOverlapResults(double valpre, double valpost);
     std::string num2str(double num, int precision = 2);
 
- 
+    // F&I T1
+    //void GetSurfaceAreaFromThreshold();
+    void GetSurfaceAreaFromThreshold(double thres, double maxscalar);
+    void ScarScore(double thres);
+
+    // F&I T2
+    void ExtractCorridorData(std::vector<vtkSmartPointer<vtkDijkstraGraphGeodesicPath>> allShortestPaths);
+    void NeighbourhoodFillingPercentage(std::vector<int> points);
+    int RecursivePointNeighbours(vtkIdType pointId, int order);
+    void GetNeighboursAroundPoint2(int pointID, std::vector<std::pair<int, int>>& pointNeighbourAndOrder, int max_order);
+    void getCorridorPoints(std::vector<vtkSmartPointer<vtkDijkstraGraphGeodesicPath>> allShortestPaths);
+    bool InsertPointIntoVisitedList2(vtkIdType id, int order);
+    void CorridorFromPointList(std::vector<int> points, bool circleToStart = true);
+
+    // F&I T3
+    void SetSourceAndTarget(vtkSmartPointer<vtkPolyData> sc, vtkSmartPointer<vtkPolyData> tg);
+    void TransformSource2Target();
+
+    CemrgScarAdvanced();
+};
+#endif // CemrgScarAdvanced_h
