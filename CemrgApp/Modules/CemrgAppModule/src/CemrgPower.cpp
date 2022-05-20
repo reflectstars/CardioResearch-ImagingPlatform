@@ -184,4 +184,80 @@ mitk::Surface::Pointer CemrgPower::MapPowerTransmitterToLandmarks(mitk::DataNode
     T0->SetElement(1, 3, x0[1]);
     T0->SetElement(2, 3, x0[2]);
 
-    vtkMatrix4x4::Multiply4x4(T0, T2
+    vtkMatrix4x4::Multiply4x4(T0, T2, T3);
+
+    //T3=T1*R1*R2*T0;
+
+    T0->SetElement(0, 3, mps[0][0] - x0[0]);
+    T0->SetElement(1, 3, mps[0][1] - x0[1]);
+    T0->SetElement(2, 3, mps[0][2] - x0[2]);
+    vtkMatrix4x4::Multiply4x4(T0, T3, vtk_T);
+
+    vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
+    transform->SetMatrix(vtk_T);
+    /*
+      for (int i=0; i<4; i++) {
+        for (int j=0; j<4; j++) {
+          cerr << "T(" << i << "," << j << ")=" << vtk_T->GetElement(i,j) << endl;
+
+        }
+      }
+      //*/
+    vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
+
+    transformFilter->SetInputData(polydata);
+    transformFilter->SetTransform(transform);
+    transformFilter->Update();
+
+    // Output EBR mesh for ribSpacingX in project directory
+    QString EBRmeshPath = projectDirectory + "/ebr" + QString::number(currentRibSpacing) + ".vtk";
+    vtkSmartPointer<vtkPolyDataWriter> writer = vtkSmartPointer<vtkPolyDataWriter>::New();
+    writer->SetFileName(EBRmeshPath.toLocal8Bit().data());
+    writer->SetInputData(transformFilter->GetOutput());
+    writer->Write();
+
+    // Load in EBR mesh
+    mesh = mitk::IOUtil::Load<mitk::Surface>(EBRmeshPath.toStdString());
+    return mesh;
+}
+
+mitk::Surface::Pointer CemrgPower::CalculateAcousticIntensity(mitk::Surface::Pointer endoMesh) {
+
+    /*****************************************************************
+    // Calculate acoustic intensity on mesh
+    ******************************************************************/
+    // Read EBR vtk mesh
+    vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
+    // Same as output mesh from MapPowerTransmitterToLandmarks
+    QString EBRmeshPath = projectDirectory + "/ebr" + QString::number(currentRibSpacing) + ".vtk";
+
+    // ################ NEED if loop to check if file exists! //
+    reader->SetFileName(EBRmeshPath.toLocal8Bit().data());
+    reader->Update();
+    vtkPolyData* ebr_pointSet = reader->GetOutput();
+
+    // MITK load Endo Mesh
+    //QString meshPath = projectDirectory + "/transformed-" + QString::number(meshNo) + ".vtk";
+    //mitk::Surface::Pointer surf = mitk::IOUtil::Load<mitk::Surface>(meshPath.toStdString());
+    //vtkSmartPointer<vtkPolyData> pd = surf->GetVtkPolyData();
+
+    vtkSmartPointer<vtkPolyData> endo_polydata = endoMesh->GetVtkPolyData();
+
+    // Read transmitter
+    double xaxis[3], yaxis[3], zaxis[3];
+    double x0[3], x1[3], y0[3], y1[3], trans_loc[3];
+
+    // Get points from transformed EBR template (Hardcoded)
+    //vtkPointSet* ebr_pointSet = transformFilter->GetOutput();
+    //xaxis=trans[109129]-trans[70672]
+    //yaxis= trans[70672] -trans[62114]
+
+    ebr_pointSet->GetNumberOfPoints();
+    //cerr << "Number of points =" << ebr_pointSet->GetNumberOfPoints() << endl;
+    //int corner[4]={100247, 72364, 72063, 112175};
+    ebr_pointSet->GetPoint(100247, x0);
+    ebr_pointSet->GetPoint(72364, x1);
+    ebr_pointSet->GetPoint(72063, y0);
+    ebr_pointSet->GetPoint(112175, y1);
+    //*
+    trans_loc[0] = (x0[0] + x1[0] + y0[0] + y1[
