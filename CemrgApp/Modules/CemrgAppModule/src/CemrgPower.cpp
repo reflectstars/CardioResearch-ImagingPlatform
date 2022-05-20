@@ -400,4 +400,77 @@ mitk::Surface::Pointer CemrgPower::CalculateAcousticIntensity(mitk::Surface::Poi
     extractSelection->Update();
 
     // Write out new endo mesh only where Intensity>0
-    QString outEndoMeshPath = proje
+    QString outEndoMeshPath = projectDirectory + "/endo" + QString::number(currentRibSpacing) + ".vtk";
+    vtkSmartPointer<vtkUnstructuredGridWriter> writer2 = vtkSmartPointer<vtkUnstructuredGridWriter>::New();
+    writer2->SetFileName(outEndoMeshPath.toLocal8Bit().data());
+    writer2->SetInputData(extractSelection->GetOutput());
+    writer2->Write();
+
+    // Load in Endo mesh
+    mitk::Surface::Pointer mesh;
+    mesh = mitk::IOUtil::Load<mitk::Surface>(outEndoMeshPath.toStdString());
+
+    cout << "TESTESTETETET" << mesh->GetVtkPolyData()->GetNumberOfCells() << endl;
+    cerr << "output Endo mesh filename in CemrgPower.cpp = " << outEndoMeshPath.toStdString() << endl;
+    return mesh;
+}
+
+mitk::Surface::Pointer CemrgPower::ReferenceAHA(
+    mitk::PointSet::Pointer lmNode, mitk::Surface::Pointer refSurface) {
+
+    //Read the mesh data
+    vtkSmartPointer<vtkPolyData> pd = refSurface->GetVtkPolyData();
+
+    //Prepare landmarks
+    std::vector<mitk::Point3D> LandMarks;
+    if (lmNode.IsNull())
+        return refSurface;
+    for (mitk::PointSet::PointsIterator it = lmNode->Begin(); it != lmNode->End(); ++it) {
+        mitk::Point3D point;
+        point.SetElement(0, it.Value().GetElement(0));
+        point.SetElement(1, it.Value().GetElement(1));
+        point.SetElement(2, it.Value().GetElement(2));
+        LandMarks.push_back(point);
+    }//for
+
+    // std::vector<mitk::Point3D> LandMarks = ConvertMPS(lmNode);
+    // Siemens 4 LM = [apex, basecenter, RV1, RV2]; Siemens 7 LM = [apex, baseMV1, baseMV2, baseMV3, RV1, RV2, apex (just to make it 7 and different from manual LM)]
+    // Manual 6 LM = [apex, MV1, MV2, MV3, RV1, RV2]
+    if (LandMarks.size() != 4 && LandMarks.size() != 6 && LandMarks.size() != 7) return refSurface;
+    mitk::Point3D centre, RIV1, RIV2, APEX, MIV1, MIV2, MIV3;
+    if (LandMarks.size() >= 6) {
+        APEX = LandMarks.at(0);
+        MIV1 = LandMarks.at(1);
+        MIV2 = LandMarks.at(2);
+        MIV3 = LandMarks.at(3);
+        RIV1 = LandMarks.at(4);
+        RIV2 = LandMarks.at(5);
+        //Calcaulte a circle through the mitral valve points
+        centre = Circlefit3d(ZeroPoint(APEX, MIV1), ZeroPoint(APEX, MIV2), ZeroPoint(APEX, MIV3));
+        // Zero all points relative to apex
+    } else if (LandMarks.size() == 4) {
+        APEX = LandMarks.at(0);
+        RIV1 = LandMarks.at(2);
+        RIV2 = LandMarks.at(3);
+        centre = ZeroPoint(APEX, LandMarks.at(1));
+    }
+
+    //Zero all points relative to apex
+    RIV1 = ZeroPoint(APEX, RIV1);
+    RIV2 = ZeroPoint(APEX, RIV2);
+    ZeroVTKMesh(APEX, refSurface);
+    APEX = ZeroPoint(APEX, APEX);
+
+    //Calculate a circle through the mitral valve points
+    mitk::Point3D RCTR;
+
+    //Define Rotation matrix
+    mitk::Matrix<double, 3, 3> rotationMat = CalcRotationMatrix(centre, RIV2);
+
+    //Rotate mesh to new frame
+    RotateVTKMesh(rotationMat, refSurface);
+    //Angle RV cusp 2
+    double RVangle1 = atan2(RIV1.GetElement(1), RIV1.GetElement(0));
+    double RVangle2 = atan2(RIV2.GetElement(1), RIV2.GetElement(0));
+    double appendAngle;
+    //Ass
