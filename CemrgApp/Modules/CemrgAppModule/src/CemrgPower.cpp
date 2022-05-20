@@ -260,4 +260,74 @@ mitk::Surface::Pointer CemrgPower::CalculateAcousticIntensity(mitk::Surface::Poi
     ebr_pointSet->GetPoint(72063, y0);
     ebr_pointSet->GetPoint(112175, y1);
     //*
-    trans_loc[0] = (x0[0] + x1[0] + y0[0] + y1[
+    trans_loc[0] = (x0[0] + x1[0] + y0[0] + y1[0]) / 4.0;
+    trans_loc[1] = (x0[1] + x1[1] + y0[1] + y1[1]) / 4.0;
+    trans_loc[2] = (x0[2] + x1[2] + y0[2] + y1[2]) / 4.0;
+
+    xaxis[0] = x1[0] - x0[0];
+    xaxis[1] = x1[1] - x0[1];
+    xaxis[2] = x1[2] - x0[2];
+    //cerr << "xaxis =" << xaxis(0) << " " << xaxis(1) << " " << xaxis(2) << endl;
+    CemrgPower::normalise(xaxis);
+    //cerr << "xaxis =" << xaxis(0) << " " << xaxis(1) << " " << xaxis(2) << endl;
+
+    yaxis[0] = x0[0] - y0[0];
+    yaxis[1] = x0[1] - y0[1];
+    yaxis[2] = x0[2] - y0[2];
+    //cerr << "yaxis =" << yaxis(0) << " " << yaxis(1) << " " << yaxis(2) << endl;
+    CemrgPower::normalise(yaxis);
+    //cerr << "yaxis =" << yaxis(0) << " " << yaxis(1) << " " << yaxis(2) << endl;
+
+    // Find the normal axis to the face of the power transmitter
+    //zaxis=yaxis.cross(xaxis);
+    //cerr << "y.cross(x) =" << zaxis(0) << " " << zaxis(1) << " " << zaxis(2) << endl;
+    CemrgPower::crossProduct(xaxis, yaxis, zaxis);
+    //zaxis=xaxis.cross(yaxis);
+    //cerr << "x.cross(y) =" << zaxis(0) << " " << zaxis(1) << " " << zaxis(2) << endl;
+    CemrgPower::normalise(zaxis);
+    //cerr << "zaxis =" << zaxis[0] << " " << zaxis[1] << " " << zaxis[2] << endl;
+    // Initialise R;
+    vtkSmartPointer<vtkMatrix3x3> R = vtkSmartPointer<vtkMatrix3x3>::New();
+    //Eigen::Matrix3f R=Eigen::Matrix3f::Identity();
+    vtkSmartPointer<vtkMatrix4x4> R1 = vtkSmartPointer<vtkMatrix4x4>::New();
+    vtkSmartPointer<vtkMatrix4x4> vtk_T = vtkSmartPointer<vtkMatrix4x4>::New();
+
+    //Eigen::Matrix4f R1, T;
+    // Find rotation matrix to align normal axis of the power transmitter to z-axis
+    CemrgPower::fcn_RotationToUnity(zaxis, R);
+
+    R1->SetElement(0, 0, R->GetElement(0, 0));
+    R1->SetElement(0, 1, R->GetElement(0, 1));
+    R1->SetElement(0, 2, R->GetElement(0, 2));
+    R1->SetElement(1, 0, R->GetElement(1, 0));
+    R1->SetElement(1, 1, R->GetElement(1, 1));
+    R1->SetElement(1, 2, R->GetElement(1, 2));
+    R1->SetElement(2, 0, R->GetElement(2, 0));
+    R1->SetElement(2, 1, R->GetElement(2, 1));
+    R1->SetElement(2, 2, R->GetElement(2, 2));
+
+    // Initialise Transformation matrices;
+    vtkSmartPointer<vtkMatrix4x4> T0 = vtkSmartPointer<vtkMatrix4x4>::New();
+    vtkSmartPointer<vtkMatrix4x4> T1 = vtkSmartPointer<vtkMatrix4x4>::New();
+    vtkSmartPointer<vtkMatrix4x4> T2 = vtkSmartPointer<vtkMatrix4x4>::New();
+    // Apply translation
+    T0->SetElement(0, 3, -trans_loc[0]);
+    T0->SetElement(1, 3, -trans_loc[1]);
+    T0->SetElement(2, 3, -trans_loc[2]);
+
+    // Scale by 1/1000 mm->m
+    T1->SetElement(0, 0, 0.001);
+    T1->SetElement(1, 1, 0.001);
+    T1->SetElement(2, 2, -0.001);
+
+    // Get transformation to endo mesh
+    vtkMatrix4x4::Multiply4x4(R1, T0, T2);
+    vtkMatrix4x4::Multiply4x4(T1, T2, vtk_T);
+
+    // Apply transformation to endo mesh so that z-axis is aligned with direction of power beam
+    vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
+    transform->SetMatrix(vtk_T);
+
+    vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
+    transformFilter->SetInputData(endo_polydata);
+    transformFilter->Se
