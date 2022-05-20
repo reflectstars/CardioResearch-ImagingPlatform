@@ -330,4 +330,74 @@ mitk::Surface::Pointer CemrgPower::CalculateAcousticIntensity(mitk::Surface::Poi
 
     vtkSmartPointer<vtkTransformFilter> transformFilter = vtkSmartPointer<vtkTransformFilter>::New();
     transformFilter->SetInputData(endo_polydata);
-    transformFilter->Se
+    transformFilter->SetTransform(transform);
+    transformFilter->Update();
+    // Get transformed points
+    vtkPointSet* endo_pointSet = transformFilter->GetOutput();
+
+    //vtkDataArray *vertex=pointSet->GetPoints()->GetData();
+
+    // Matlab Example Computations of Acoustic Intensity
+    // P. Willis EBR Systems Aug 21, 2018
+    float f, v, atten, L, A, l;
+    f = 921.25E3; // hertz
+    v = 1560; // m/sec
+    atten = -0.3; //db/(MHz*sec)
+    L = 0.9487E-3;
+    A = 8 * 24 * pow(L, 2.0);
+    l = v / f;
+
+    // Add intensities to each point
+    vtkSmartPointer<vtkFloatArray> Intensity = vtkSmartPointer<vtkFloatArray>::New();
+    Intensity->SetNumberOfComponents(1);
+    Intensity->SetName("Intensity");
+
+    // Get the ids for points where the intensity is > 0
+    vtkSmartPointer<vtkIdTypeArray> ids = vtkSmartPointer<vtkIdTypeArray>::New();
+    ids->SetNumberOfComponents(1);
+
+    std::vector<int> newMeshPoints;
+    int size_ids = 0;
+    // Calculate the power intensity for each point
+    for (int i = 0; i < endo_polydata->GetNumberOfPoints(); i++) {
+        double rx[3];
+        endo_pointSet->GetPoint(i, rx);
+
+        float d = sqrt(pow(rx[0], 2.0) + pow(rx[1], 2.0) + pow(rx[2], 2.0)); // magnitude of r vector
+        float tempx = (M_PI * L * rx[0]) / (l * d);
+        float tempy = (M_PI * L * rx[1]) / (l * d);
+        float tempI = (A / (pow(l, 2.0) * pow(d, 2.0))) * pow(10.0, (d * atten * f) / 1E5) * sinc(tempx) * sinc(tempy);
+
+        if (tempI >= 0.0) {
+            newMeshPoints.push_back(i);
+            ids->InsertNextValue(i);
+            size_ids++;
+            Intensity->InsertNextValue(tempI);
+        } else {
+            Intensity->InsertNextValue(0.0);
+        }
+    }
+    // Append intensity scalar to input endo mesh
+    // endo_polydata->GetPointData()->AddArray(Intensity);
+    endo_polydata->GetPointData()->SetScalars(Intensity);
+    // sed -i s/'FIELD FieldData 2'/'SCALARS scalars float'/g ~/Dropbox/Work/EBR/data/$case/6_pt/rib/endo${ribspace}.vtk
+    // sed -i s/'Intensity [0-9]* [0-9]* double'/'LOOKUP_TABLE default'/g ~/Dropbox/Work/EBR/data/$case/6_pt/rib/endo${ribspace}.vtk
+
+    // So we want to extract cells using points newMeshPoints
+    vtkSmartPointer<vtkSelectionNode> selectionNode = vtkSmartPointer<vtkSelectionNode>::New();
+    selectionNode->SetFieldType(vtkSelectionNode::POINT);
+    selectionNode->SetContentType(vtkSelectionNode::INDICES);
+    selectionNode->SetSelectionList(ids);
+    selectionNode->GetProperties()->Set(vtkSelectionNode::CONTAINING_CELLS(), 1);
+
+    vtkSmartPointer<vtkSelection> selection = vtkSmartPointer<vtkSelection>::New();
+    selection->AddNode(selectionNode);
+
+    vtkSmartPointer<vtkExtractSelection> extractSelection = vtkSmartPointer<vtkExtractSelection>::New();
+    extractSelection->SetInputConnection(0, reader->GetOutputPort());
+    extractSelection->SetInputData(0, endo_polydata);
+    extractSelection->SetInputData(1, selection);
+    extractSelection->Update();
+
+    // Write out new endo mesh only where Intensity>0
+    QString outEndoMeshPath = proje
