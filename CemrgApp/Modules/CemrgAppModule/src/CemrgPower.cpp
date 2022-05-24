@@ -561,3 +561,86 @@ std::vector<mitk::Point3D> CemrgPower::ConvertMPS(mitk::DataNode::Pointer node) 
     std::vector<mitk::Point3D> points;
     mitk::BaseData::Pointer data = node->GetData();
     mitk::PointSet::Pointer set = dynamic_cast<mitk::PointSet*>(data.GetPointer());
+
+    if (set.IsNull())
+        return points;
+    for (mitk::PointSet::PointsIterator it = set->Begin(); it != set->End(); ++it) {
+        mitk::Point3D point;
+        point.SetElement(0, it.Value().GetElement(0));
+        point.SetElement(1, it.Value().GetElement(1));
+        point.SetElement(2, it.Value().GetElement(2));
+        points.push_back(point);
+    }//for
+
+    return points;
+}
+
+void CemrgPower::fcn_RotationToUnity(const double v[], vtkSmartPointer<vtkMatrix3x3>& RotationMatrix) {
+
+    double theta_x, theta_y;
+    vtkSmartPointer<vtkMatrix3x3> R_x = vtkSmartPointer<vtkMatrix3x3>::New();
+    vtkSmartPointer<vtkMatrix3x3> R_y = vtkSmartPointer<vtkMatrix3x3>::New();
+
+    double v_x[3];
+
+    theta_x = atan(v[1] / v[2]);
+    R_x->SetElement(0, 0, 1.0);
+    R_x->SetElement(0, 1, 0.0);
+    R_x->SetElement(0, 2, 0.0);
+    R_x->SetElement(1, 0, 0.0);
+    R_x->SetElement(1, 1, cos(theta_x));
+    R_x->SetElement(1, 2, -sin(theta_x));
+    R_x->SetElement(2, 0, 0.0);
+    R_x->SetElement(2, 1, sin(theta_x));
+    R_x->SetElement(2, 2, cos(theta_x));
+
+    //v_x = R_x*v;
+    R_x->MultiplyPoint(v, v_x);
+
+    //R_y << cos(theta_y), 0, sin(theta_y),
+    //        0, 1, 0,
+    //        -sin(theta_y), 0, cos(theta_y);
+
+    theta_y = atan(-v_x[0] / v_x[2]);
+    R_y->SetElement(0, 0, cos(theta_y));
+    R_y->SetElement(0, 1, 0.0);
+    R_y->SetElement(0, 2, sin(theta_y));
+    R_y->SetElement(1, 0, 0.0);
+    R_y->SetElement(1, 1, 1.0);
+    R_y->SetElement(1, 2, 0.0);
+    R_y->SetElement(2, 0, -sin(theta_y));
+    R_y->SetElement(2, 1, 0.0);
+    R_y->SetElement(2, 2, cos(theta_y));
+
+    //RotationMatrix = R_y*R_x;
+    vtkMatrix3x3::Multiply3x3(R_y, R_x, RotationMatrix);
+}
+
+//void CemrgPower::fcn_RotationFromTwoVectors(Eigen::Vector3f& a, Eigen::Vector3f& b, Eigen::Matrix3f& RotationMatrix)
+void CemrgPower::fcn_RotationFromTwoVectors(double a[], double b[], vtkSmartPointer<vtkMatrix3x3>& RotationMatrix) {
+
+    double n[3];
+
+    CemrgPower::crossProduct(a, b, n);
+    CemrgPower::normalise(n);
+
+    if (CemrgPower::dotProduct(a, b) <= 1.0) {
+
+        double angle = acos(CemrgPower::dotProduct(a, b));
+        double s = sin(angle);
+        double c = cos(angle);
+        double t = 1 - c;
+        //cerr << "t= " << t << endl;
+        //cerr << "xyz= " << n(0) << " " << n(1) << " " << n(2) << endl;
+
+        //RotationMatrix << t*n(0)*n(0) + c     , t*n(0)*n(1) - s*n(2), t*n(0)*n(2)+ s*n(1) ,
+        //                  t*n(0)*n(1) + s*n(2), t*n(1)*n(1) + c     ,  t*n(1)*n(2) - s*n(0),
+        //                  t*n(0)*n(2) - s*n(1), t*n(1)*n(2) + s*n(0), t*n(2)*n(2) +c      ;
+        RotationMatrix->SetElement(0, 0, t * n[0] * n[0] + c);
+        RotationMatrix->SetElement(0, 1, t * n[0] * n[1] - s * n[2]);
+        RotationMatrix->SetElement(0, 2, t * n[0] * n[2] + s * n[1]);
+        RotationMatrix->SetElement(1, 0, t * n[0] * n[1] + s * n[2]);
+        RotationMatrix->SetElement(1, 1, t * n[1] * n[1] + c);
+        RotationMatrix->SetElement(1, 2, t * n[1] * n[2] - s * n[0]);
+        RotationMatrix->SetElement(2, 0, t * n[0] * n[2] - s * n[1]);
+        RotationMatrix->SetElement(2, 1, t * n[1] * n[2] + s 
