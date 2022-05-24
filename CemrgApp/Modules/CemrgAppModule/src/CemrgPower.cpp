@@ -473,4 +473,91 @@ mitk::Surface::Pointer CemrgPower::ReferenceAHA(
     double RVangle1 = atan2(RIV1.GetElement(1), RIV1.GetElement(0));
     double RVangle2 = atan2(RIV2.GetElement(1), RIV2.GetElement(0));
     double appendAngle;
-    //Ass
+    //Assuming RV angle1 < RV angle 2
+    if (RVangle1 < RVangle2) {
+        RVangle1 = atan2(RIV2.GetElement(1), RIV2.GetElement(0));
+        RVangle2 = atan2(RIV1.GetElement(1), RIV1.GetElement(0));
+    }
+    MITK_INFO << ("RVangles: (1) " + QString::number(RVangle1) + ", (2) " + QString::number(RVangle2)).toStdString();
+
+    if ((LandMarks.size() == 6)) { // only do this for manual segmentation, with 6 points
+        appendAngle = -RVangle1;
+        //appendAngle -= freeA - ( M_PI / 3 );
+    } else {
+        if (RVangle1 > 0) {
+            appendAngle = -((M_PI - RVangle1) / 2 + RVangle1) + M_PI / 3;
+        } else {
+            appendAngle = -RVangle1 / 2 + M_PI / 3;
+        }
+    }
+    qDebug() << "appendAngle " << appendAngle;
+    //Point angles
+    std::vector<double> pAngles;
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        double pAngle;
+        double* pt = pd->GetPoint(i);
+        pAngle = atan2(pt[1], pt[0]) + appendAngle;
+        pAngle = pAngle * (pAngle > 0 ? 1 : 0) + (2 * M_PI + pAngle) * (pAngle < 0 ? 1 : 0);
+        pAngles.push_back(pAngle);
+    }
+    //Setup flattened AHA mesh
+    mitk::Surface::Pointer flatSurface = refSurface->Clone();
+    vtkSmartPointer<vtkPolyData> poly = flatSurface->GetVtkPolyData();
+    for (int i = 0; i < poly->GetNumberOfPoints(); i++) {
+        double* point = poly->GetPoint(i);
+        double  radii = point[2];
+        double  theta = pAngles.at(i);
+        point[0] = radii * cos(theta);
+        point[1] = radii * sin(theta);
+        point[2] = 0;
+        poly->GetPoints()->SetPoint(i, point);
+    }//_for
+    poly->BuildLinks();
+
+    //Return to the original position and rotation
+    APEX = ZeroPoint(LandMarks.at(0), APEX);
+    RotateVTKMesh(rotationMat.GetInverse().as_matrix(), refSurface);
+    ZeroVTKMesh(APEX, refSurface);
+    return refSurface;
+}
+
+/**************************************************************************************************
+ *************** PRIVATE FUNCTIONS ****************************************************************
+ **************************************************************************************************/
+
+double CemrgPower::sinc(const double x) {
+
+    if (x == 0) return 1;
+    return sin(M_PI * x) / (M_PI * x);
+}
+
+void CemrgPower::normalise(double v[]) {
+
+    double mag;
+    mag = sqrt((v[0] * v[0]) + (v[1] * v[1]) + (v[2] * v[2]));
+    v[0] = v[0] / mag;
+    v[1] = v[1] / mag;
+    v[2] = v[2] / mag;
+}
+
+void CemrgPower::crossProduct(double a[], double b[], double product[]) {
+
+    product[0] = a[1] * b[2] - a[2] * b[1];
+    product[1] = -(a[0] * b[2] - a[2] * b[0]);
+    product[2] = a[0] * b[1] - a[1] * b[0];
+}
+
+double CemrgPower::dotProduct(double a[], double b[]) {
+
+    double product = 0.0;
+    // Loop for calculate cot product
+    for (int i = 0; i < 3; i++)
+        product = product + a[i] * b[i];
+    return product;
+}
+
+std::vector<mitk::Point3D> CemrgPower::ConvertMPS(mitk::DataNode::Pointer node) {
+
+    std::vector<mitk::Point3D> points;
+    mitk::BaseData::Pointer data = node->GetData();
+    mitk::PointSet::Pointer set = dynamic_cast<mitk::PointSet*>(data.GetPointer());
