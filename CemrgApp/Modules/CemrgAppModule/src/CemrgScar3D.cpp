@@ -168,4 +168,88 @@ mitk::Surface::Pointer CemrgScar3D::Scar3D(std::string directory, mitk::Image::P
         double sratio = std::numeric_limits<decltype(sratio)>::max(); // mean=0 always false
 
         if (maxSdev < sdev) maxSdev = sdev;
-        if (maxSratio < sratio) maxSratio
+        if (maxSratio < sratio) maxSratio = sratio;
+
+        /**
+         * Placeholder variables for potential GUI options.
+         * We removed them in favour of a simplified functionality
+         *
+        int _ONLY_POSITIVE_STDEVS = 1;
+        int _SCAR_AS_STANDARD_DEVIATION = 1;
+        int _SCAR_MIP = 1;
+        *
+        * Comments that refer to this are identified with the following:
+        * [placeholder]
+         *
+         */
+
+        // [placeholder] simplified functionality without placeholder variables
+        if (sdev < 0) sdev = 0;
+
+        // [placeholder] comlete functionality with placeholder variables
+        // if (_ONLY_POSITIVE_STDEVS == 1 && sdev < 0) sdev = 0;
+
+        scalarsOnlyStDev->InsertTuple1(i, sdev);
+        scalarsOnlyIntensity->InsertTuple1(i, scalar);
+        scalarsOnlyMultiplier->InsertTuple1(i, sratio);
+
+        //For default scalar to plot
+        double scalarToPlot = (scalar - mean) / sqrt(var);
+
+        if (scalarToPlot <= 0) scalarToPlot = 0;
+
+        // [placeholder] simplified functionality without placeholder variables
+        scalars->InsertTuple1(i, scalarToPlot);
+        allScalarsInShell.push_back(scalarToPlot);
+
+        // [placeholder] comlete functionality with placeholder variables
+        // if (_SCAR_MIP == 1 && _SCAR_AS_STANDARD_DEVIATION == 1) {
+        //      scalars->InsertTuple1(i, scalarToPlot);
+        //      allScalarsInShell.push_back(scalarToPlot);
+        // } else {
+        //      scalars->InsertTuple1(i, scalar);
+        //      allScalarsInShell.push_back(scalar); }
+    }//_for
+
+    scarDebugLabel = visitedImage;
+    pd->GetCellData()->SetScalars(scalars);
+    surface->SetVtkPolyData(pd);
+    return surface;
+}
+
+mitk::Surface::Pointer CemrgScar3D::ClipMesh3D(mitk::Surface::Pointer surface, mitk::PointSet::Pointer landmarks) {
+
+    //Retrieve mean and distance of 3 points
+    double x_c = 0;
+    double y_c = 0;
+    double z_c = 0;
+    for (int i = 0; i < landmarks->GetSize(); i++) {
+        x_c = x_c + landmarks->GetPoint(i).GetElement(0);
+        y_c = y_c + landmarks->GetPoint(i).GetElement(1);
+        z_c = z_c + landmarks->GetPoint(i).GetElement(2);
+    }//_for
+    x_c /= landmarks->GetSize();
+    y_c /= landmarks->GetSize();
+    z_c /= landmarks->GetSize();
+    double * distance = new double[landmarks->GetSize()];
+    for (int i = 0; i < landmarks->GetSize(); i++) {
+        double x_d = landmarks->GetPoint(i).GetElement(0) - x_c;
+        double y_d = landmarks->GetPoint(i).GetElement(1) - y_c;
+        double z_d = landmarks->GetPoint(i).GetElement(2) - z_c;
+        distance[i] = sqrt(pow(x_d, 2) + pow(y_d, 2) + pow(z_d, 2));
+    }//_for
+    double radius = *std::max_element(distance, distance + landmarks->GetSize());
+    double centre[3] = {x_c, y_c, z_c};
+
+    //Clipper
+    vtkSmartPointer<vtkSphere> sphere = vtkSmartPointer<vtkSphere>::New();
+    sphere->SetCenter(centre);
+    sphere->SetRadius(radius);
+    vtkSmartPointer<vtkClipPolyData> clipper = vtkSmartPointer<vtkClipPolyData>::New();
+    clipper->SetClipFunction(sphere);
+    clipper->SetInputData(surface->GetVtkPolyData());
+    clipper->InsideOutOff();
+    clipper->Update();
+
+    //Extract and clean surface mesh
+  
