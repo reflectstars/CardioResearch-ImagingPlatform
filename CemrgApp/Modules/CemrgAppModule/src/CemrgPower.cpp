@@ -643,4 +643,98 @@ void CemrgPower::fcn_RotationFromTwoVectors(double a[], double b[], vtkSmartPoin
         RotationMatrix->SetElement(1, 1, t * n[1] * n[1] + c);
         RotationMatrix->SetElement(1, 2, t * n[1] * n[2] - s * n[0]);
         RotationMatrix->SetElement(2, 0, t * n[0] * n[2] - s * n[1]);
-        RotationMatrix->SetElement(2, 1, t * n[1] * n[2] + s 
+        RotationMatrix->SetElement(2, 1, t * n[1] * n[2] + s * n[0]);
+        RotationMatrix->SetElement(2, 2, t * n[2] * n[2] + c);
+    }
+}
+
+/*************************************************************************************************
+ * Copied from CemrgStrain
+ *************************************************************************************************/
+mitk::Matrix<double, 3, 3> CemrgPower::CalcRotationMatrix(mitk::Point3D point1, mitk::Point3D point2) {
+
+    //X Axis
+    mitk::Matrix<double, 1, 3> vec;
+    vec[0][0] = point1.GetElement(0);
+    vec[0][1] = point1.GetElement(1);
+    vec[0][2] = point1.GetElement(2);
+    double theta_x = atan(vec[0][1] / vec[0][2]);
+
+    mitk::Matrix<double, 3, 3> R_x;
+    R_x[0][0] = 1;
+    R_x[0][1] = 0;
+    R_x[0][2] = 0;
+    R_x[1][0] = 0;
+    R_x[1][1] = cos(theta_x);
+    R_x[1][2] = -sin(theta_x);
+    R_x[2][0] = 0;
+    R_x[2][1] = sin(theta_x);
+    R_x[2][2] = cos(theta_x);
+
+    //Y Axis
+    mitk::Matrix<double, 3, 1> vecX;
+    vecX = R_x * vec.GetTranspose();
+    double theta_y = atan(-vecX[0][0] / vecX[2][0]);
+
+    mitk::Matrix<double, 3, 3> R_y;
+    R_y[0][0] = cos(theta_y);
+    R_y[0][1] = 0;
+    R_y[0][2] = sin(theta_y);
+    R_y[1][0] = 0;
+    R_y[1][1] = 1;
+    R_y[1][2] = 0;
+    R_y[2][0] = -sin(theta_y);
+    R_y[2][1] = 0;
+    R_y[2][2] = cos(theta_y);
+
+    //Z Axis
+    point2 = RotatePoint(R_y * R_x, point2);
+    double theta_z = atan(-point2.GetElement(1) / point2.GetElement(0));
+
+    mitk::Matrix<double, 3, 3> R_z;
+    R_z[0][0] = cos(theta_z);
+    R_z[0][1] = -sin(theta_z);
+    R_z[0][2] = 0;
+    R_z[1][0] = sin(theta_z);
+    R_z[1][1] = cos(theta_z);
+    R_z[1][2] = 0;
+    R_z[2][0] = 0;
+    R_z[2][1] = 0;
+    R_z[2][2] = 1;
+
+    //Rotation Matrix
+    mitk::Matrix<double, 3, 3> R;
+    R = R_z * R_y * R_x;
+    return R;
+}
+
+mitk::Point3D CemrgPower::Circlefit3d(mitk::Point3D point1, mitk::Point3D point2, mitk::Point3D point3) {
+
+    //v1, v2 describe the vectors from p1 to p2 and p3, resp.
+    mitk::Point3D v1;
+    mitk::Point3D v2;
+    for (int i = 0; i < 3; i++) {
+        v1.SetElement(i, point2.GetElement(i) - point1.GetElement(i));
+        v2.SetElement(i, point3.GetElement(i) - point1.GetElement(i));
+    }
+
+    //l1, l2 describe the lengths of those vectors
+    double l1 = sqrt(pow(v1.GetElement(0), 2) + pow(v1.GetElement(1), 2) + pow(v1.GetElement(2), 2));
+    double l2 = sqrt(pow(v2.GetElement(0), 2) + pow(v2.GetElement(1), 2) + pow(v2.GetElement(2), 2));
+
+    //v1n, v2n describe the normalized vectors v1 and v2
+    mitk::Point3D v1n = v1;
+    mitk::Point3D v2n = v2;
+    for (int i = 0; i < 3; i++) {
+        v1n.SetElement(i, v1n.GetElement(i) / l1);
+        v2n.SetElement(i, v2n.GetElement(i) / l2);
+    }
+
+    //nv describes the normal vector on the plane of the circle
+    mitk::Point3D nv;
+    nv.SetElement(0, v1n.GetElement(1) * v2n.GetElement(2) - v1n.GetElement(2) * v2n.GetElement(1));
+    nv.SetElement(1, v1n.GetElement(2) * v2n.GetElement(0) - v1n.GetElement(0) * v2n.GetElement(2));
+    nv.SetElement(2, v1n.GetElement(0) * v2n.GetElement(1) - v1n.GetElement(1) * v2n.GetElement(0));
+
+    //v2nb: orthogonalization of v2n against v1n
+    dou
