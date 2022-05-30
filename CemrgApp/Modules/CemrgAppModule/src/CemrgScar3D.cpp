@@ -422,4 +422,90 @@ void CemrgScar3D::SetScarSegImage(const mitk::Image::Pointer image) {
     //Setup roiImage
     itkImageType::Pointer itkImage = itkImageType::New();
     mitk::CastToItkImage(image, itkImage);
-    this->sca
+    this->scarSegImage = itkImage;
+}
+
+void CemrgScar3D::SetVoxelBasedProjection(bool value) {
+
+    voxelBasedProjection = value;
+}
+
+double CemrgScar3D::GetIntensityAlongNormal(itkImageType::Pointer scarImage, itkImageType::Pointer visitedImage,
+    double n_x, double n_y, double n_z, double centre_x, double centre_y, double centre_z) {
+
+    //Declarations
+    std::vector<mitk::Point3D> pointsOnAndAroundNormal;
+
+    //Normalize
+    double tempArr[3];
+    tempArr[0] = n_x;
+    tempArr[1] = n_y;
+    tempArr[2] = n_z;
+    double norm = vtkMath::Normalize(tempArr);
+    n_x /= norm;
+    n_y /= norm;
+    n_z /= norm;
+
+    double scar_step_min = minStep;
+    double scar_step_max = maxStep;
+    double scar_step_size = 1;
+
+    const itkImageType::SizeType sizeOfImage = scarImage->GetLargestPossibleRegion().GetSize();
+    int maxX = sizeOfImage[0];
+    int maxY = sizeOfImage[1];
+    int maxZ = sizeOfImage[2];
+
+    for (double i = scar_step_min; i <= scar_step_max; i += scar_step_size) {
+        double x = floor(centre_x + (i * n_x));
+        double y = floor(centre_y + (i * n_y));
+        double z = floor(centre_z + (i * n_z));
+
+        for (int a = -1; a <= 1; a++) {
+            for (int b = -1; b <= 1; b++) {
+                for (int c = -1; c <= 1; c++) {
+                    if (x + a >= 0 && x + a < maxX && y + b >= 0 && y + b < maxY && z + c >= 0 && z + c < maxZ) {
+                        mitk::Point3D tempPoint;
+                        tempPoint.SetElement(0, x + a);
+                        tempPoint.SetElement(1, y + b);
+                        tempPoint.SetElement(2, z + c);
+                        pointsOnAndAroundNormal.push_back(tempPoint);
+                    }
+                }
+            }
+        }
+        //        a=0;b=0;c=0;
+        //        if (x+a>=0 && x+a<maxX && y+b>=0 && y+b<maxY && z+c>=0 && z+c<maxZ) {
+        //            mitk::Point3D tempPoint;
+        //            tempPoint.SetElement(0, x+a);
+        //            tempPoint.SetElement(1, y+b);
+        //            tempPoint.SetElement(2, z+c);
+        //            pointsOnAndAroundNormal.push_back(tempPoint);
+        //        }
+    }//_for
+
+    double insty = 0;
+    if (methodType == 1) {
+        //Statistical measure 1 returns mean
+        insty = GetStatisticalMeasure(pointsOnAndAroundNormal, scarImage, visitedImage, 1);
+    } else if (methodType == 2) {
+        //Statistical measure 2 returns max
+        insty = GetStatisticalMeasure(pointsOnAndAroundNormal, scarImage, visitedImage, 2);
+    }//_if
+
+    return insty;
+}
+
+double CemrgScar3D::GetStatisticalMeasure(std::vector<mitk::Point3D> pointsOnAndAroundNormal,
+    itkImageType::Pointer scarImage, itkImageType::Pointer visitedImage, int measure) {
+
+    //Declarations
+    itkImageType::IndexType pixel_xyz;
+    int size = pointsOnAndAroundNormal.size();
+    double sum = 0, returnVal = 0;
+
+    //Filter out cut regions
+    for (int i = 0; i < size; i++) {
+        pixel_xyz[0] = pointsOnAndAroundNormal.at(i).GetElement(0);
+        pixel_xyz[1] = pointsOnAndAroundNormal.at(i).GetElement(1);
+        pixel_xyz[2] = pointsOnAndAroundNormal.at(i).GetElement(2);
+        double va
