@@ -252,4 +252,79 @@ mitk::Surface::Pointer CemrgScar3D::ClipMesh3D(mitk::Surface::Pointer surface, m
     clipper->Update();
 
     //Extract and clean surface mesh
-  
+    vtkSmartPointer<vtkDataSetSurfaceFilter> surfer = vtkSmartPointer<vtkDataSetSurfaceFilter>::New();
+    surfer->SetInputData(clipper->GetOutput());
+    surfer->Update();
+    vtkSmartPointer<vtkCleanPolyData> cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
+    cleaner->SetInputConnection(surfer->GetOutputPort());
+    cleaner->Update();
+    vtkSmartPointer<vtkPolyDataConnectivityFilter> lrgRegion = vtkSmartPointer<vtkPolyDataConnectivityFilter>::New();
+    lrgRegion->SetInputConnection(cleaner->GetOutputPort());
+    lrgRegion->SetExtractionModeToLargestRegion();
+    lrgRegion->Update();
+    cleaner = vtkSmartPointer<vtkCleanPolyData>::New();
+    cleaner->SetInputConnection(lrgRegion->GetOutputPort());
+    cleaner->Update();
+
+    //Return the clipped mesh
+    surface->SetVtkPolyData(cleaner->GetOutput());
+    return surface;
+}
+
+bool CemrgScar3D::CalculateMeanStd(mitk::Image::Pointer lgeImage, mitk::Image::Pointer roiImage, double& mean, double& stdv) {
+
+    //Access image volumes
+    mitk::ImagePixelReadAccessor<float, 3> readAccess1(lgeImage);
+    float* pvLGE = (float*)readAccess1.GetData();
+    mitk::ImagePixelReadAccessor<float, 3> readAccess2(roiImage);
+    float* pvROI = (float*)readAccess2.GetData();
+
+    int dimsLGE = lgeImage->GetDimensions()[0] * lgeImage->GetDimensions()[1] * lgeImage->GetDimensions()[2];
+    int dimsROI = roiImage->GetDimensions()[0] * roiImage->GetDimensions()[1] * roiImage->GetDimensions()[2];
+    if (dimsLGE != dimsROI) {
+        QMessageBox::critical(NULL, "Attention", "The mask and the image dimensions do not match!");
+        return false;
+    }//_wrong dimensions
+
+    //Loop image voxels
+    std::vector<float> voxelValues;
+    for (int i = 0; i < dimsROI; i++) {
+        if (*pvROI == 1)
+            voxelValues.push_back(*pvLGE);
+        pvLGE++;
+        pvROI++;
+    }//_for
+
+    //Calculate mean and std
+    double sumDeviation = 0.0;
+    double sum = std::accumulate(voxelValues.begin(), voxelValues.end(), 0.0);
+    mean = sum / voxelValues.size();
+    for (unsigned int i = 0; i < voxelValues.size(); i++)
+        sumDeviation += (voxelValues[i] - mean) * (voxelValues[i] - mean);
+    stdv = std::sqrt(sumDeviation / voxelValues.size());
+    return true;
+}
+
+double CemrgScar3D::Thresholding(double thresh) {
+
+    int ctr1 = 0, ctr2 = 0;
+    for (int i = 0; i < scalars->GetNumberOfTuples(); i++) {
+        double value = scalars->GetValue(i);
+        if (value == -1) {
+            ctr1++;
+            continue;
+        }//_if
+        if (value > thresh) ctr2++;
+    }
+    double percentage = (ctr2 * 100.0) / (scalars->GetNumberOfTuples() - ctr1);
+    return percentage;
+}
+
+void CemrgScar3D::SaveNormalisedScalars(double divisor, mitk::Surface::Pointer surface, QString name) {
+
+    MITK_INFO << "Dividing by the mean value of the bloodpool.";
+    MITK_ERROR(divisor == 0) << "Can't divide by 0.";
+
+    vtkSmartPointer<vtkCellDataToPointData> cell_to_point = vtkSmartPointer<vtkCellDataToPointData>::New();
+    vtkSmartPointer<vtkPolyData> pd = surface->GetVtkPolyData();
+    vtkSmartPointer<vtkFloatArray> normalisedScalars = vtkSmartPo
