@@ -86,4 +86,86 @@ mitk::Surface::Pointer CemrgScar3D::Scar3D(std::string directory, mitk::Image::P
     //Read in the mesh
     std::string path = directory + "/" + segname;
     mitk::Surface::Pointer surface = CemrgCommonUtils::LoadVTKMesh(path);
-    vtkSmartPointer<vtkPo
+    vtkSmartPointer<vtkPolyData> pd = surface->GetVtkPolyData();
+
+    //Calculate normals
+    vtkSmartPointer<vtkPolyDataNormals> normals = vtkSmartPointer<vtkPolyDataNormals>::New();
+    vtkSmartPointer<vtkPolyData> tempPD = vtkSmartPointer<vtkPolyData>::New();
+    tempPD->DeepCopy(pd);
+    normals->ComputeCellNormalsOn();
+    normals->SetInputData(tempPD);
+    normals->SplittingOff();
+    normals->Update();
+    pd = normals->GetOutput();
+
+    //Declarations
+    vtkIdType numCellPoints;
+    vtkSmartPointer<vtkIdList> cellPoints = vtkSmartPointer<vtkIdList>::New();
+    vtkSmartPointer<vtkFloatArray> cellNormals = vtkFloatArray::SafeDownCast(pd->GetCellData()->GetNormals());
+    std::vector<double> allScalarsInShell;
+    vtkSmartPointer<vtkFloatArray> scalarsOnlyStDev = vtkSmartPointer<vtkFloatArray>::New();
+    vtkSmartPointer<vtkFloatArray> scalarsOnlyMultiplier = vtkSmartPointer<vtkFloatArray>::New();
+    vtkSmartPointer<vtkFloatArray> scalarsOnlyIntensity = vtkSmartPointer<vtkFloatArray>::New();
+    itkImageType::IndexType pixelXYZ;
+    itkImageType::PointType pointXYZ;
+
+    double maxSdev = -1e9;
+    double maxSratio = -1e9;
+    double mean = 0, var = 1;
+
+    for (int i = 0; i < pd->GetNumberOfCells(); i++) {
+        double pN[3];
+        cellNormals->GetTuple(i, pN);
+        double cX = 0, cY = 0, cZ = 0, numPoints = 0;
+        pd->GetCellPoints(i, cellPoints);
+        numCellPoints = cellPoints->GetNumberOfIds();
+
+        for (vtkIdType neighborPoint = 0; neighborPoint < numCellPoints; ++neighborPoint) {
+
+            //Get the neighbor point ID
+            vtkIdType neighborPointID = cellPoints->GetId(neighborPoint);
+
+            //Get the neighbor point position
+            double cP[3];
+            pd->GetPoint(neighborPointID, cP);
+
+            // ITK method
+            pointXYZ[0] = cP[0];
+            pointXYZ[1] = cP[1];
+            pointXYZ[2] = cP[2];
+            scarImage->TransformPhysicalPointToIndex(pointXYZ, pixelXYZ);
+            cP[0] = pixelXYZ[0];
+            cP[1] = pixelXYZ[1];
+            cP[2] = pixelXYZ[2];
+
+            cX += cP[0];
+            cY += cP[1];
+            cZ += cP[2];
+
+            numPoints++;
+        }//_innerLoop
+
+        cX /= numPoints;
+        cY /= numPoints;
+        cZ /= numPoints;
+
+        // ITK method
+        pointXYZ[0] = pN[0];
+        pointXYZ[1] = pN[1];
+        pointXYZ[2] = pN[2];
+        scarImage->TransformPhysicalPointToIndex(pointXYZ, pixelXYZ);
+        pN[0] = pixelXYZ[0];
+        pN[1] = pixelXYZ[1];
+        pN[2] = pixelXYZ[2];
+
+        double scalar = GetIntensityAlongNormal(scarImage, visitedImage, pN[0], pN[1], pN[2], cX, cY, cZ);
+
+        if (scalar > maxScalar) maxScalar = scalar;
+        if (scalar < minScalar) minScalar = scalar;
+
+        double sdev = (scalar - mean) / sqrt(var);
+        // double sratio = mean ? scalar / mean : std::numeric_limits<decltype(sratio)>::max(); // mean=0 always false
+        double sratio = std::numeric_limits<decltype(sratio)>::max(); // mean=0 always false
+
+        if (maxSdev < sdev) maxSdev = sdev;
+        if (maxSratio < sratio) maxSratio
