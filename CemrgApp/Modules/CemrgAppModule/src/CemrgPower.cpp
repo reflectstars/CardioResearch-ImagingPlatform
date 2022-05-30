@@ -737,4 +737,94 @@ mitk::Point3D CemrgPower::Circlefit3d(mitk::Point3D point1, mitk::Point3D point2
     nv.SetElement(2, v1n.GetElement(0) * v2n.GetElement(1) - v1n.GetElement(1) * v2n.GetElement(0));
 
     //v2nb: orthogonalization of v2n against v1n
-    dou
+    double dotp = v2n.GetElement(0) * v1n.GetElement(0) +
+        v2n.GetElement(1) * v1n.GetElement(1) +
+        v2n.GetElement(2) * v1n.GetElement(2);
+
+    mitk::Point3D v2nb = v2n;
+    for (int i = 0; i < 3; i++) {
+        v2nb.SetElement(i, v2nb.GetElement(i) - dotp * v1n.GetElement(i));
+    }
+
+    //Normalize v2nb
+    double l2nb = sqrt(pow(v2nb.GetElement(0), 2) + pow(v2nb.GetElement(1), 2) + pow(v2nb.GetElement(2), 2));
+    for (int i = 0; i < 3; i++) {
+        v2nb.SetElement(i, v2nb.GetElement(i) / l2nb);
+    }
+
+    //Calculate 2d coordinates of points in each plane
+    mitk::Point2D p3_2d;
+    p3_2d.SetElement(0, 0);
+    p3_2d.SetElement(1, 0);
+    for (int i = 0; i < 3; i++) {
+        p3_2d.SetElement(0, p3_2d.GetElement(0) + v2.GetElement(i) * v1n.GetElement(i));
+        p3_2d.SetElement(1, p3_2d.GetElement(1) + v2.GetElement(i) * v2nb.GetElement(i));
+    }
+
+    //Calculate the fitting circle
+    double a = l1;
+    double b = p3_2d.GetElement(0);
+    double c = p3_2d.GetElement(1);
+    double t = .5 * (a - b) / c;
+    double scale1 = b / 2 + c * t;
+    double scale2 = c / 2 - b * t;
+
+    //centre
+    mitk::Point3D centre;
+    for (int i = 0; i < 3; i++) {
+        double val = point1.GetElement(i) + (scale1 * v1n.GetElement(i)) + (scale2 * v2nb.GetElement(i));
+        centre.SetElement(i, val);
+    }
+
+    // qDebug() << centre.GetElement(0) << centre.GetElement(1) << centre.GetElement(2);
+    /*radius
+    double radius = sqrt(pow(centre.GetElement(0) - point1.GetElement(0),2) +
+                         pow(centre.GetElement(1) - point1.GetElement(1),2) +
+                         pow(centre.GetElement(2) - point1.GetElement(2),2));*/
+    return centre;
+}
+
+
+mitk::Point3D CemrgPower::RotatePoint(mitk::Matrix<double, 3, 3> rotationMatrix, mitk::Point3D point) {
+
+    mitk::Matrix<double, 1, 3> vec;
+    mitk::Matrix<double, 3, 1> ans;
+
+    vec[0][0] = point.GetElement(0);
+    vec[0][1] = point.GetElement(1);
+    vec[0][2] = point.GetElement(2);
+    ans = rotationMatrix * vec.GetTranspose();
+    point.SetElement(0, ans[0][0]);
+    point.SetElement(1, ans[1][0]);
+    point.SetElement(2, ans[2][0]);
+
+    return point;
+}
+
+void CemrgPower::RotateVTKMesh(mitk::Matrix<double, 3, 3> rotationMatrix, mitk::Surface::Pointer surface) {
+
+    //Retrieve the data
+    vtkSmartPointer<vtkPolyData> pd = surface->GetVtkPolyData();
+
+    //Rotate mesh into new coordiantes
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        mitk::Point3D point;
+        double* pt = pd->GetPoint(i);
+        point.SetElement(0, pt[0]);
+        point.SetElement(1, pt[1]);
+        point.SetElement(2, pt[2]);
+        point = RotatePoint(rotationMatrix, point);
+        pt[0] = point.GetElement(0);
+        pt[1] = point.GetElement(1);
+        pt[2] = point.GetElement(2);
+        pd->GetPoints()->SetPoint(i, pt);
+    }
+}
+
+mitk::Point3D CemrgPower::ZeroPoint(mitk::Point3D apex, mitk::Point3D point) {
+
+    //Zero relative to the apex
+    point.SetElement(0, point.GetElement(0) - apex.GetElement(0));
+    point.SetElement(1, point.GetElement(1) - apex.GetElement(1));
+    point.SetElement(2, point.GetElement(2) - apex.GetElement(2));
+    retu
