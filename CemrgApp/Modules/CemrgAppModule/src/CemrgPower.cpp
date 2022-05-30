@@ -827,4 +827,18 @@ mitk::Point3D CemrgPower::ZeroPoint(mitk::Point3D apex, mitk::Point3D point) {
     point.SetElement(0, point.GetElement(0) - apex.GetElement(0));
     point.SetElement(1, point.GetElement(1) - apex.GetElement(1));
     point.SetElement(2, point.GetElement(2) - apex.GetElement(2));
-    retu
+    return point;
+}
+
+void CemrgPower::ZeroVTKMesh(mitk::Point3D apex, mitk::Surface::Pointer surface) {
+
+    //Retrieve the data
+    vtkSmartPointer<vtkPolyData> pd = surface->GetVtkPolyData();
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        double* point = pd->GetPoint(i);
+        point[0] = point[0] - apex.GetElement(0);
+        point[1] = point[1] - apex.GetElement(1);
+        point[2] = point[2] - apex.GetElement(2);
+        pd->GetPoints()->SetPoint(i, point);
+    }
+}
