@@ -508,4 +508,91 @@ double CemrgScar3D::GetStatisticalMeasure(std::vector<mitk::Point3D> pointsOnAnd
         pixel_xyz[0] = pointsOnAndAroundNormal.at(i).GetElement(0);
         pixel_xyz[1] = pointsOnAndAroundNormal.at(i).GetElement(1);
         pixel_xyz[2] = pointsOnAndAroundNormal.at(i).GetElement(2);
-        double va
+        double val = scarSegImage->GetPixel(pixel_xyz);
+        if (std::abs(val - 3.0) < 1E-10)
+            return -1;
+    }//_for
+
+    //Reutrn mean
+    if (measure == 1) {
+
+        for (int i = 0; i < size; i++) {
+            pixel_xyz[0] = pointsOnAndAroundNormal.at(i).GetElement(0);
+            pixel_xyz[1] = pointsOnAndAroundNormal.at(i).GetElement(1);
+            pixel_xyz[2] = pointsOnAndAroundNormal.at(i).GetElement(2);
+            sum += scarImage->GetPixel(pixel_xyz);
+        }
+        returnVal = sum / size;
+    }//_if_mean
+
+    //Return max
+    if (measure == 2) {
+        double max = -1;
+        int maxIndex = 0;
+
+        for (int i = 0; i < size; i++) {
+            pixel_xyz[0] = pointsOnAndAroundNormal.at(i).GetElement(0);
+            pixel_xyz[1] = pointsOnAndAroundNormal.at(i).GetElement(1);
+            pixel_xyz[2] = pointsOnAndAroundNormal.at(i).GetElement(2);
+            double greyVal = scarImage->GetPixel(pixel_xyz);
+            double visitedStatus = visitedImage->GetPixel(pixel_xyz);
+            bool maxIntensity = greyVal > max;
+            if (voxelBasedProjection)
+                maxIntensity = (greyVal > max) && (visitedStatus < 1);
+            if (maxIntensity) {
+                max = greyVal;
+                maxIndex = i;
+            }
+        }
+
+        if (max == -1) {
+            returnVal = 0;
+        } else {
+            returnVal = max;
+            //Now change the visited status of this max pixel
+            pixel_xyz[0] = pointsOnAndAroundNormal.at(maxIndex).GetElement(0);
+            pixel_xyz[1] = pointsOnAndAroundNormal.at(maxIndex).GetElement(1);
+            pixel_xyz[2] = pointsOnAndAroundNormal.at(maxIndex).GetElement(2);
+            visitedImage->SetPixel(pixel_xyz, 1);
+        }
+    }//_if_max
+
+    //Sum along the normal (integration)
+    if (measure == 3) {
+
+        for (int i = 0; i < size; i++) {
+            pixel_xyz[0] = pointsOnAndAroundNormal.at(i).GetElement(0);
+            pixel_xyz[1] = pointsOnAndAroundNormal.at(i).GetElement(1);
+            pixel_xyz[2] = pointsOnAndAroundNormal.at(i).GetElement(2);
+            double greyVal = scarImage->GetPixel(pixel_xyz);
+            sum += greyVal;
+        }
+        returnVal = sum;
+    }//_if_sum
+
+    return returnVal;
+}
+
+void CemrgScar3D::ItkDeepCopy(itkImageType::Pointer input, itkImageType::Pointer output) {
+
+    output->SetRegions(input->GetLargestPossibleRegion());
+    output->Allocate();
+
+    itk::ImageRegionConstIterator<itkImageType> inputIterator(input, input->GetLargestPossibleRegion());
+    itk::ImageRegionIterator<itkImageType> outputIterator(output, output->GetLargestPossibleRegion());
+
+    while (!inputIterator.IsAtEnd()) {
+        outputIterator.Set(0);
+        ++inputIterator;
+        ++outputIterator;
+    }
+}
+
+void CemrgScar3D::SaveScarDebugImage(QString name, QString dir) {
+
+    typedef itk::Image<short, 3> ImageType;
+    using WriterType = itk::ImageFileWriter< ImageType >;
+    if (!name.contains(".nii", Qt::CaseSensitive))
+        name = name + ".nii";
+    QString debugSCARname = dir + "/" + name;
+    MITK_INFO << "Sav
