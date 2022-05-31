@@ -595,4 +595,10 @@ void CemrgScar3D::SaveScarDebugImage(QString name, QString dir) {
     if (!name.contains(".nii", Qt::CaseSensitive))
         name = name + ".nii";
     QString debugSCARname = dir + "/" + name;
-    MITK_INFO << "Sav
+    MITK_INFO << "Saving to: " + debugSCARname.toStdString();
+
+    WriterType::Pointer writer = WriterType::New();
+    writer->SetFileName(debugSCARname.toStdString());
+    writer->SetInput(this->scarDebugLabel);
+    writer->Update();
+}
