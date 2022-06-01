@@ -253,3 +253,83 @@ std::vector<double> CemrgStrains::CalculateStrainsPlot(int meshNo, mitk::DataNod
     for (int i = 0; i < 16; i++)
         strainRCL.at(i) /= std::count(refCellLabels.begin(), refCellLabels.end(), i + 1);
 
+    return strainRCL;
+}
+
+double CemrgStrains::CalculateSDI(std::vector<std::vector<double>> valueVectors, int cycleLengths, int noFrames) {
+
+    if (valueVectors.size() == 0)
+        return 0.0;
+
+    std::vector<double> T2Ps(16, 0.0);
+    std::vector<double> values(noFrames, 0.0);
+
+    //Find time to peak values
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < noFrames; j++)
+            values[j] = valueVectors[j][i];
+        int index = std::distance(values.begin(), std::min_element(values.begin(), values.end()));
+        double time2peak = index * (cycleLengths / noFrames);
+        //T2Ps as a percentage of the cardiac cycle
+        double t2p = (time2peak * 100) / cycleLengths;
+        T2Ps.push_back(t2p);
+    }
+
+    //SD
+    double sumDeviation = 0.0;
+    double sum = std::accumulate(T2Ps.begin(), T2Ps.end(), 0.0);
+    double mean = sum / T2Ps.size();
+    for (unsigned int i = 0; i < T2Ps.size(); i++)
+        sumDeviation += (T2Ps[i] - mean) * (T2Ps[i] - mean);
+    return std::sqrt(sumDeviation / T2Ps.size());
+}
+
+std::vector<mitk::Surface::Pointer> CemrgStrains::ReferenceGuideLines(mitk::DataNode::Pointer lmNode) {
+
+    //Prepare landmarks
+    std::vector<mitk::Point3D> LandMarks = ConvertMPS(lmNode);
+    mitk::Point3D CNTR, APEX, RIV1, RIV2, MIV1, MIV2, MIV3;
+
+    if (LandMarks.size() >= 6) {
+
+        APEX = LandMarks.at(0);
+        MIV1 = LandMarks.at(1);
+        MIV2 = LandMarks.at(2);
+        MIV3 = LandMarks.at(3);
+        RIV1 = LandMarks.at(4);
+        RIV2 = LandMarks.at(5);
+        //Calcaulte a circle through the mitral valve points
+        CNTR = Circlefit3d(MIV1, MIV2, MIV3);
+
+    } else if (LandMarks.size() == 4) {
+
+        APEX = LandMarks.at(0);
+        CNTR = LandMarks.at(1);
+        RIV1 = LandMarks.at(2);
+        RIV2 = LandMarks.at(3);
+    }
+
+    //Calculate points
+    mitk::Point3D A1, A2, AB;
+    mitk::Point3D PNT1, PNT2;
+    A1 = RIV1 - APEX;
+    A2 = RIV2 - APEX;
+    AB = CNTR - APEX;
+    PNT1.SetElement(0, APEX.GetElement(0) + Dot(A1, AB) / Dot(AB, AB) * AB.GetElement(0));
+    PNT1.SetElement(1, APEX.GetElement(1) + Dot(A1, AB) / Dot(AB, AB) * AB.GetElement(1));
+    PNT1.SetElement(2, APEX.GetElement(2) + Dot(A1, AB) / Dot(AB, AB) * AB.GetElement(2));
+    PNT2.SetElement(0, APEX.GetElement(0) + Dot(A2, AB) / Dot(AB, AB) * AB.GetElement(0));
+    PNT2.SetElement(1, APEX.GetElement(1) + Dot(A2, AB) / Dot(AB, AB) * AB.GetElement(1));
+    PNT2.SetElement(2, APEX.GetElement(2) + Dot(A2, AB) / Dot(AB, AB) * AB.GetElement(2));
+
+    //Draw guidelines
+    mitk::Surface::Pointer line1 = mitk::Surface::New();
+    vtkSmartPointer<vtkLineSource> lineSource1 = vtkSmartPointer<vtkLineSource>::New();
+    lineSource1->SetPoint1(APEX.GetElement(0), APEX.GetElement(1), APEX.GetElement(2));
+    lineSource1->SetPoint2(CNTR.GetElement(0), CNTR.GetElement(1), CNTR.GetElement(2));
+    lineSource1->Update();
+    line1->SetVtkPolyData(lineSource1->GetOutput());
+
+    mitk::Surface::Pointer line2 = mitk::Surface::New();
+    vtkSmartPointer<vtkLineSource> lineSource2 = vtkSmartPointer<vtkLineSource>::New();
+    lineSource2->SetPoint1(RIV1.GetElement(0), RIV1.GetEleme
