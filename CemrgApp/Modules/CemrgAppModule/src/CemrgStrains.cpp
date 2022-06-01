@@ -332,4 +332,73 @@ std::vector<mitk::Surface::Pointer> CemrgStrains::ReferenceGuideLines(mitk::Data
 
     mitk::Surface::Pointer line2 = mitk::Surface::New();
     vtkSmartPointer<vtkLineSource> lineSource2 = vtkSmartPointer<vtkLineSource>::New();
-    lineSource2->SetPoint1(RIV1.GetElement(0), RIV1.GetEleme
+    lineSource2->SetPoint1(RIV1.GetElement(0), RIV1.GetElement(1), RIV1.GetElement(2));
+    lineSource2->SetPoint2(PNT1.GetElement(0), PNT1.GetElement(1), PNT1.GetElement(2));
+    lineSource2->Update();
+    line2->SetVtkPolyData(lineSource2->GetOutput());
+
+    mitk::Surface::Pointer line3 = mitk::Surface::New();
+    vtkSmartPointer<vtkLineSource> lineSource3 = vtkSmartPointer<vtkLineSource>::New();
+    lineSource3->SetPoint1(RIV2.GetElement(0), RIV2.GetElement(1), RIV2.GetElement(2));
+    lineSource3->SetPoint2(PNT2.GetElement(0), PNT2.GetElement(1), PNT2.GetElement(2));
+    lineSource3->Update();
+    line3->SetVtkPolyData(lineSource3->GetOutput());
+
+    /* // Commenting out the circle guideline as we dont have 3 MV points with Siemen Landmarks
+    mitk::Surface::Pointer circle = mitk::Surface::New();
+    vtkSmartPointer<vtkPlaneSource> plane = vtkSmartPointer<vtkPlaneSource>::New();
+    plane->SetOrigin(CNTR.GetElement(0), CNTR.GetElement(1), CNTR.GetElement(2));
+    plane->SetPoint1(MIV1.GetElement(0), MIV1.GetElement(1), MIV1.GetElement(2));
+    plane->SetPoint2(MIV2.GetElement(0), MIV2.GetElement(1), MIV2.GetElement(2));
+    plane->Update();
+    vtkSmartPointer<vtkRegularPolygonSource> polygonSource = vtkSmartPointer<vtkRegularPolygonSource>::New();
+    polygonSource->GeneratePolygonOff();
+    polygonSource->SetNumberOfSides(50);
+    polygonSource->SetRadius(radius);
+    polygonSource->SetCenter(CNTR.GetElement(0), CNTR.GetElement(1), CNTR.GetElement(2));
+    polygonSource->SetNormal(plane->GetNormal());
+    polygonSource->Update();
+    circle->SetVtkPolyData(polygonSource->GetOutput()); //*/
+
+    //Prepare guidelines vector
+    std::vector<mitk::Surface::Pointer> guidelines;
+    guidelines.push_back(line1);
+    guidelines.push_back(line2);
+    guidelines.push_back(line3);
+    //guidelines.push_back(circle);
+    return guidelines;
+}
+
+mitk::Surface::Pointer CemrgStrains::ReferenceAHA(mitk::DataNode::Pointer lmNode, int segRatios[], bool pacingSite) {
+
+    //Read the mesh data
+    vtkSmartPointer<vtkPolyData> pd = refSurface->GetVtkPolyData();
+
+    //Prepare landmarks
+    std::vector<mitk::Point3D> LandMarks = ConvertMPS(lmNode);
+    // Siemens 4 LM = [apex, basecenter, RV1, RV2];
+    // Siemens 7 LM = [apex, baseMV1, baseMV2, baseMV3, RV1, RV2, apex
+    // (just to make it 7 and different from manual LM)]
+    // Manual 6 LM = [apex, MV1, MV2, MV3, RV1, RV2]
+    if (LandMarks.size() != 4 && LandMarks.size() != 6 && LandMarks.size() != 7)
+        return refSurface;
+
+    mitk::Point3D centre, RIV1, RIV2, APEX, MIV1, MIV2, MIV3;
+    if (LandMarks.size() >= 6) {
+
+        APEX = LandMarks.at(0);
+        MIV1 = LandMarks.at(1);
+        MIV2 = LandMarks.at(2);
+        MIV3 = LandMarks.at(3);
+        RIV1 = LandMarks.at(4);
+        RIV2 = LandMarks.at(5);
+        // Calcaulte a circle through the mitral valve points
+        centre = Circlefit3d(ZeroPoint(APEX, MIV1), ZeroPoint(APEX, MIV2), ZeroPoint(APEX, MIV3));
+
+    } else if (LandMarks.size() == 4) {
+
+        // Zero all points relative to apex
+        APEX = LandMarks.at(0);
+        RIV1 = LandMarks.at(2);
+        RIV2 = LandMarks.at(3);
+        centre = ZeroPoint(APEX, LandMarks.a
