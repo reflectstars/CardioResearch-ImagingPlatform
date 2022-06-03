@@ -493,4 +493,81 @@ mitk::Surface::Pointer CemrgStrains::ReferenceAHA(mitk::DataNode::Pointer lmNode
     for (vtkIdType cellID = 0; cellID < pd->GetNumberOfCells(); cellID++) {
         double cAngle;
         mitk::Point3D ctrT = GetCellCenter(pd, cellID);
-        cAngle = atan2(ctrT.G
+        cAngle = atan2(ctrT.GetElement(1), ctrT.GetElement(0)) + appendAngle;
+        cAngle = cAngle * (cAngle > 0 ? 1 : 0) + (2 * M_PI + cAngle) * (cAngle < 0 ? 1 : 0);
+        cAngles.push_back(cAngle);
+    }
+
+    //Base points
+    std::vector<int> pBindex;
+    std::vector<int> pMindex;
+    std::vector<int> pAindex;
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        double* pt = pd->GetPoint(i);
+        pBindex.push_back((pt[2] >= MID ? 1 : 0) * (pt[2] <= TOP ? 1 : 0));
+        pMindex.push_back((pt[2] >= BAS ? 1 : 0) * (pt[2] < MID ? 1 : 0));
+        pAindex.push_back((pt[2] < BAS ? 1 : 0));
+    }
+
+    //Centre points
+    std::vector<int> cBindex;
+    std::vector<int> cMindex;
+    std::vector<int> cAindex;
+    for (vtkIdType cellID = 0; cellID < pd->GetNumberOfCells(); cellID++) {
+        mitk::Point3D ctrT = GetCellCenter(pd, cellID);
+        cBindex.push_back((ctrT.GetElement(2) >= MID ? 1 : 0) * (ctrT.GetElement(2) < TOP ? 1 : 0));
+        cMindex.push_back((ctrT.GetElement(2) >= BAS ? 1 : 0) * (ctrT.GetElement(2) < MID ? 1 : 0));
+        cAindex.push_back((ctrT.GetElement(2) < BAS ? 1 : 0));
+    }
+
+    //Assign points labels for 3 layers
+    AssignpLabels(0, refPointLabels, pBindex, pAngles, sepA, freeA);
+    AssignpLabels(1, refPointLabels, pMindex, pAngles, sepA, freeA);
+    AssignpLabels(2, refPointLabels, pAindex, pAngles, sepA, freeA);
+    AssigncLabels(0, refCellLabels, cBindex, cAngles, sepA, freeA);
+    AssigncLabels(1, refCellLabels, cMindex, cAngles, sepA, freeA);
+    AssigncLabels(2, refCellLabels, cAindex, cAngles, sepA, freeA);
+
+    //Calculate reference mesh attributes
+    for (vtkIdType cellID = 0; cellID < pd->GetNumberOfCells(); cellID++) {
+
+        //Ignore non AHA segments
+        if (refCellLabels[cellID] == 0)
+            continue;
+
+        //Area
+        double area = GetCellArea(pd, cellID);
+        refArea.push_back(area);
+        refAhaArea.at(refCellLabels[cellID] - 1) += area;
+
+        //Axis
+        vtkSmartPointer<vtkCell> cell = pd->GetCell(cellID);
+        mitk::Matrix<double, 3, 3> J;
+        mitk::Matrix<double, 3, 3> Q = GetCellAxes(cell, RCTR, J);
+        refJ.push_back(J);
+        refQ.push_back(Q);
+    }
+
+    //Setup flattened AHA mesh
+    flatSurface = refSurface->Clone();
+    vtkSmartPointer<vtkPolyData> poly = flatSurface->GetVtkPolyData();
+    for (int i = 0; i < poly->GetNumberOfPoints(); i++) {
+        double* point = poly->GetPoint(i);
+        double  radii = point[2];
+        double  theta = pAngles.at(i);
+        point[0] = radii * cos(theta);
+        point[1] = radii * sin(theta);
+        point[2] = 0;
+        poly->GetPoints()->SetPoint(i, point);
+    }//_for
+    poly->BuildLinks();
+    for (vtkIdType cellID = 0; cellID < poly->GetNumberOfCells(); cellID++)
+        if (refCellLabels[cellID] == 0)
+            poly->DeleteCell(cellID);
+    poly->RemoveDeletedCells();
+
+    //Setup colors of the AHA segmentations
+    vtkSmartPointer<vtkUnsignedCharArray> segmentColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
+    segmentColors->SetNumberOfComponents(3);
+    segmentColors->SetNumberOfTuples(pd->GetNumberOfPoints());
+    for (int i = 0; i < pd->GetNumb
