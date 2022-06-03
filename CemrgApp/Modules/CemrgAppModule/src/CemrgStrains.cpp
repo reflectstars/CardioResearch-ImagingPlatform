@@ -401,4 +401,96 @@ mitk::Surface::Pointer CemrgStrains::ReferenceAHA(mitk::DataNode::Pointer lmNode
         APEX = LandMarks.at(0);
         RIV1 = LandMarks.at(2);
         RIV2 = LandMarks.at(3);
-        centre = ZeroPoint(APEX, LandMarks.a
+        centre = ZeroPoint(APEX, LandMarks.at(1));
+    }
+
+    //Zero all points relative to apex
+    RIV1 = ZeroPoint(APEX, RIV1);
+    RIV2 = ZeroPoint(APEX, RIV2);
+    ZeroVTKMesh(APEX, refSurface);
+    APEX = ZeroPoint(APEX, APEX);
+
+    //Calculate a circle through the mitral valve points
+    mitk::Point3D RCTR;
+
+    //Define Rotation matrix
+    mitk::Matrix<double, 3, 3> rotationMat = CalcRotationMatrix(centre, RIV2);
+
+    //Rotate points to new frame
+    if (LandMarks.size() >= 6) {
+        MIV1 = RotatePoint(rotationMat, MIV1);
+        MIV2 = RotatePoint(rotationMat, MIV2);
+        MIV3 = RotatePoint(rotationMat, MIV3);
+    }
+    RIV1 = RotatePoint(rotationMat, RIV1);
+    RIV2 = RotatePoint(rotationMat, RIV2);
+    RCTR = RotatePoint(rotationMat, centre);
+
+    /**
+      TEST
+      **/
+      //qDebug() << "RCTR IS " << RCTR.GetElement(0) << RCTR.GetElement(1) << RCTR.GetElement(2);
+
+      //Rotate mesh to new frame
+    RotateVTKMesh(rotationMat, refSurface);
+
+    //Find the mesh Z range
+    //double min = GetMinMax(pd,2).at(0);
+    //double max = GetMinMax(pd,2).at(1);
+    double min = APEX.GetElement(2);
+    double max = RCTR.GetElement(2);
+    double RangeZ = (max - min) * 1.0; //0.99;
+
+    //Top, mid, and base segments heights
+    double TOP = RangeZ * (segRatios[0] / 100.00 + segRatios[1] / 100.00 + segRatios[2] / 100.0) + min;
+    double MID = RangeZ * (segRatios[1] / 100.00 + segRatios[2] / 100.0) + min;
+    double BAS = RangeZ * (segRatios[2] / 100.0) + min;
+
+    //Angle RV cusp 2
+    double RVangle1 = atan2(RIV1.GetElement(1), RIV1.GetElement(0));
+    double RVangle2 = atan2(RIV2.GetElement(1), RIV2.GetElement(0));
+
+    //Assuming RV angle1 < RV angle 2
+    double appendAngle;
+    double sepA, freeA;
+
+    if ((LandMarks.size() == 6) && (pacingSite == false)) {
+
+        // only do this for manual segmentation, with 6 points
+        sepA = (RVangle2 - RVangle1) / 2;
+        freeA = (2 * M_PI - (RVangle2 - RVangle1)) / 4;
+        appendAngle = -RVangle1;
+        //appendAngle -= freeA - ( M_PI / 3 );
+
+    } else {
+
+        sepA = (2 * M_PI) / 6;
+        freeA = (2 * M_PI) / 6;
+        if (RVangle1 > 0) {
+            appendAngle = -((M_PI - RVangle1) / 2 + RVangle1) + M_PI / 3;
+        } else {
+            appendAngle = -RVangle1 / 2 + M_PI / 3;
+        }//_if
+        if (pacingSite == true) {
+            appendAngle += M_PI / 6;
+        }
+
+    }//_if
+    qDebug() << "appendAngle " << appendAngle;
+
+    //Point angles
+    std::vector<double> pAngles;
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        double pAngle;
+        double* pt = pd->GetPoint(i);
+        pAngle = atan2(pt[1], pt[0]) + appendAngle;
+        pAngle = pAngle * (pAngle > 0 ? 1 : 0) + (2 * M_PI + pAngle) * (pAngle < 0 ? 1 : 0);
+        pAngles.push_back(pAngle);
+    }
+
+    //Centre angles
+    std::vector<double> cAngles;
+    for (vtkIdType cellID = 0; cellID < pd->GetNumberOfCells(); cellID++) {
+        double cAngle;
+        mitk::Point3D ctrT = GetCellCenter(pd, cellID);
+        cAngle = atan2(ctrT.G
