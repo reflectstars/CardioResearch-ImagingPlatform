@@ -570,4 +570,98 @@ mitk::Surface::Pointer CemrgStrains::ReferenceAHA(mitk::DataNode::Pointer lmNode
     vtkSmartPointer<vtkUnsignedCharArray> segmentColors = vtkSmartPointer<vtkUnsignedCharArray>::New();
     segmentColors->SetNumberOfComponents(3);
     segmentColors->SetNumberOfTuples(pd->GetNumberOfPoints());
-    for (int i = 0; i < pd->GetNumb
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        float rgbA[3];
+        std::vector<float> rgbV = GetAHAColour((int)refPointLabels.at(i));
+        std::copy(rgbV.begin(), rgbV.end(), rgbA);
+        segmentColors->InsertTuple(i, rgbA);
+    }
+    refSurface->GetVtkPolyData()->GetPointData()->SetScalars(segmentColors);
+
+    //Return to the original position and rotation
+    APEX = ZeroPoint(LandMarks.at(0), APEX);
+    RotateVTKMesh(rotationMat.GetInverse().as_matrix(), refSurface);
+    ZeroVTKMesh(APEX, refSurface);
+    return refSurface;
+}
+
+mitk::Surface::Pointer CemrgStrains::FlattenedAHA() {
+
+    if (refCellLabels.empty())
+        return mitk::Surface::New();
+    return flatSurface;
+}
+
+vtkSmartPointer<vtkFloatArray> CemrgStrains::GetFlatSurfScalars() const {
+
+    return flatSurfScalars;
+}
+
+std::vector<float> CemrgStrains::GetAHAColour(int label) {
+
+    switch (label) {
+    case 1:
+        return std::vector<float>{230, 25, 75};
+    case 2:
+        return std::vector<float>{60, 180, 75};
+    case 3:
+        return std::vector<float>{255, 225, 25};
+    case 4:
+        return std::vector<float>{0, 130, 200};
+    case 5:
+        return std::vector<float>{245, 130, 48};
+    case 6:
+        return std::vector<float>{145, 30, 180};
+    case 7:
+        return std::vector<float>{70, 240, 240};
+    case 8:
+        return std::vector<float>{250, 190, 190};
+    case 9:
+        return std::vector<float>{0, 128, 128};
+    case 10:
+        return std::vector<float>{170, 110, 40};
+    case 11:
+        return std::vector<float>{128, 0, 0};
+    case 12:
+        return std::vector<float>{128, 128, 0};
+    case 13:
+        return std::vector<float>{0, 0, 128};
+    case 14:
+        return std::vector<float>{128, 128, 128};
+    case 15:
+        return std::vector<float>{255, 255, 255};
+    case 16:
+        return std::vector<float>{230, 190, 255};
+    }
+    return std::vector<float>{0, 0, 0};
+}
+
+/**************************************************************************************************
+ *************** HELPER FUNCTIONS *****************************************************************
+ **************************************************************************************************/
+
+mitk::Point3D CemrgStrains::ZeroPoint(mitk::Point3D apex, mitk::Point3D point) {
+
+    //Zero relative to the apex
+    point.SetElement(0, point.GetElement(0) - apex.GetElement(0));
+    point.SetElement(1, point.GetElement(1) - apex.GetElement(1));
+    point.SetElement(2, point.GetElement(2) - apex.GetElement(2));
+    return point;
+}
+
+void CemrgStrains::ZeroVTKMesh(mitk::Point3D apex, mitk::Surface::Pointer surface) {
+
+    //Retrieve the data
+    vtkSmartPointer<vtkPolyData> pd = surface->GetVtkPolyData();
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        double* point = pd->GetPoint(i);
+        point[0] = point[0] - apex.GetElement(0);
+        point[1] = point[1] - apex.GetElement(1);
+        point[2] = point[2] - apex.GetElement(2);
+        pd->GetPoints()->SetPoint(i, point);
+    }
+}
+
+mitk::Point3D CemrgStrains::RotatePoint(mitk::Matrix<double, 3, 3> rotationMatrix, mitk::Point3D point) {
+
+    m
