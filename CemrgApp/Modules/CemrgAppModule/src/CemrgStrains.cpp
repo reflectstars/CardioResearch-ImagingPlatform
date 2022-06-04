@@ -664,4 +664,89 @@ void CemrgStrains::ZeroVTKMesh(mitk::Point3D apex, mitk::Surface::Pointer surfac
 
 mitk::Point3D CemrgStrains::RotatePoint(mitk::Matrix<double, 3, 3> rotationMatrix, mitk::Point3D point) {
 
-    m
+    mitk::Matrix<double, 1, 3> vec;
+    mitk::Matrix<double, 3, 1> ans;
+
+    vec[0][0] = point.GetElement(0);
+    vec[0][1] = point.GetElement(1);
+    vec[0][2] = point.GetElement(2);
+    ans = rotationMatrix * vec.GetTranspose();
+    point.SetElement(0, ans[0][0]);
+    point.SetElement(1, ans[1][0]);
+    point.SetElement(2, ans[2][0]);
+
+    return point;
+}
+
+void CemrgStrains::RotateVTKMesh(mitk::Matrix<double, 3, 3> rotationMatrix, mitk::Surface::Pointer surface) {
+
+    //Retrieve the data
+    vtkSmartPointer<vtkPolyData> pd = surface->GetVtkPolyData();
+
+    //Rotate mesh into new coordiantes
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        mitk::Point3D point;
+        double* pt = pd->GetPoint(i);
+        point.SetElement(0, pt[0]);
+        point.SetElement(1, pt[1]);
+        point.SetElement(2, pt[2]);
+        point = RotatePoint(rotationMatrix, point);
+        pt[0] = point.GetElement(0);
+        pt[1] = point.GetElement(1);
+        pt[2] = point.GetElement(2);
+        pd->GetPoints()->SetPoint(i, pt);
+    }
+}
+
+double CemrgStrains::GetCellArea(vtkSmartPointer<vtkPolyData> pd, vtkIdType cellID) {
+
+    vtkSmartPointer<vtkCell> cell = pd->GetCell(cellID);
+    vtkSmartPointer<vtkTriangle> triangle = dynamic_cast<vtkTriangle*>(cell.GetPointer());
+    double pt1[3], pt2[3], pt3[3];
+    triangle->GetPoints()->GetPoint(0, pt1);
+    triangle->GetPoints()->GetPoint(1, pt2);
+    triangle->GetPoints()->GetPoint(2, pt3);
+
+    double area = vtkTriangle::TriangleArea(pt1, pt2, pt3);
+    return area;
+}
+
+mitk::Point3D CemrgStrains::GetCellCenter(vtkSmartPointer<vtkPolyData> pd, vtkIdType cellID) {
+
+    mitk::Point3D centre;
+    vtkSmartPointer<vtkCell> cell = pd->GetCell(cellID);
+    vtkSmartPointer<vtkTriangle> triangle = dynamic_cast<vtkTriangle*>(cell.GetPointer());
+    double pt1[3], pt2[3], pt3[3];
+    triangle->GetPoints()->GetPoint(0, pt1);
+    triangle->GetPoints()->GetPoint(1, pt2);
+    triangle->GetPoints()->GetPoint(2, pt3);
+
+    double x = pt1[0] + pt2[0] + pt3[0];
+    double y = pt1[1] + pt2[1] + pt3[1];
+    double z = pt1[2] + pt2[2] + pt3[2];
+    centre.SetElement(0, x / 3);
+    centre.SetElement(1, y / 3);
+    centre.SetElement(2, z / 3);
+    return centre;
+}
+
+mitk::Matrix<double, 3, 3> CemrgStrains::GetCellAxes(vtkSmartPointer<vtkCell>& cell, mitk::Point3D& termPt, mitk::Matrix<double, 3, 3>& J) {
+
+    //Three nodes of the triangle
+    vtkSmartPointer<vtkTriangle> triangle = dynamic_cast<vtkTriangle*>(cell.GetPointer());
+    double pt1[3], pt2[3], pt3[3];
+    triangle->GetPoints()->GetPoint(0, pt1);
+    triangle->GetPoints()->GetPoint(1, pt2);
+    triangle->GetPoints()->GetPoint(2, pt3);
+
+    //Coordinate system: vectors of the triangle
+    mitk::Point3D vc1, vc2, vc3;
+    vc1.SetElement(0, pt2[0] - pt1[0]);
+    vc1.SetElement(1, pt2[1] - pt1[1]);
+    vc1.SetElement(2, pt2[2] - pt1[2]);
+    vc2.SetElement(0, pt3[0] - pt1[0]);
+    vc2.SetElement(1, pt3[1] - pt1[1]);
+    vc2.SetElement(2, pt3[2] - pt1[2]);
+    vc3.SetElement(0, Cross(vc1, vc2).GetElement(0) / Norm(Cross(vc1, vc2)));
+    vc3.SetElement(1, Cross(vc1, vc2).GetElement(1) / Norm(Cross(vc1, vc2)));
+    vc3
