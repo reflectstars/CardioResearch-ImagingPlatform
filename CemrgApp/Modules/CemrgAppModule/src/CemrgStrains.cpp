@@ -749,4 +749,82 @@ mitk::Matrix<double, 3, 3> CemrgStrains::GetCellAxes(vtkSmartPointer<vtkCell>& c
     vc2.SetElement(2, pt3[2] - pt1[2]);
     vc3.SetElement(0, Cross(vc1, vc2).GetElement(0) / Norm(Cross(vc1, vc2)));
     vc3.SetElement(1, Cross(vc1, vc2).GetElement(1) / Norm(Cross(vc1, vc2)));
-    vc3
+    vc3.SetElement(2, Cross(vc1, vc2).GetElement(2) / Norm(Cross(vc1, vc2)));
+
+    //Radial axis
+    mitk::Point3D radiAxis = vc3;
+    //Normalise radial axis
+    double norm = Norm(radiAxis);
+    radiAxis.SetElement(0, radiAxis.GetElement(0) / norm);
+    radiAxis.SetElement(1, radiAxis.GetElement(1) / norm);
+    radiAxis.SetElement(2, radiAxis.GetElement(2) / norm);
+
+    //Longitudinal axis
+    mitk::Point3D longAxis;
+    double dot = Dot(termPt, radiAxis);
+    longAxis.SetElement(0, termPt.GetElement(0) - dot * radiAxis.GetElement(0));
+    longAxis.SetElement(1, termPt.GetElement(1) - dot * radiAxis.GetElement(1));
+    longAxis.SetElement(2, termPt.GetElement(2) - dot * radiAxis.GetElement(2));
+    //Normalise longitudinal axis
+    norm = Norm(longAxis);
+    longAxis.SetElement(0, longAxis.GetElement(0) / norm);
+    longAxis.SetElement(1, longAxis.GetElement(1) / norm);
+    longAxis.SetElement(2, longAxis.GetElement(2) / norm);
+
+    //Circumferential axis
+    mitk::Point3D circAxis = Cross(longAxis, radiAxis);
+    //Normalise circumferential axis
+    norm = Norm(circAxis);
+    circAxis.SetElement(0, circAxis.GetElement(0) / norm);
+    circAxis.SetElement(1, circAxis.GetElement(1) / norm);
+    circAxis.SetElement(2, circAxis.GetElement(2) / norm);
+
+    //Assemble J matrix
+    J[0][0] = vc1.GetElement(0);
+    J[0][1] = vc2.GetElement(0);
+    J[0][2] = vc3.GetElement(0);
+    J[1][0] = vc1.GetElement(1);
+    J[1][1] = vc2.GetElement(1);
+    J[1][2] = vc3.GetElement(1);
+    J[2][0] = vc1.GetElement(2);
+    J[2][1] = vc2.GetElement(2);
+    J[2][2] = vc3.GetElement(2);
+
+    //Return axes
+    mitk::Matrix<double, 3, 3> Q;
+    Q[0][0] = radiAxis.GetElement(0);
+    Q[0][1] = radiAxis.GetElement(1);
+    Q[0][2] = radiAxis.GetElement(2);
+    Q[1][0] = circAxis.GetElement(0);
+    Q[1][1] = circAxis.GetElement(1);
+    Q[1][2] = circAxis.GetElement(2);
+    Q[2][0] = longAxis.GetElement(0);
+    Q[2][1] = longAxis.GetElement(1);
+    Q[2][2] = longAxis.GetElement(2);
+    return Q;
+}
+
+/**************************************************************************************************
+ *************** PRIVATE FUNCTIONS ****************************************************************
+ **************************************************************************************************/
+
+mitk::Surface::Pointer CemrgStrains::ReadVTKMesh(int meshNo) {
+
+    //Read a mesh
+    QString meshPath = projectDirectory + "/transformed-" + QString::number(meshNo) + ".vtk";
+    return CemrgCommonUtils::LoadVTKMesh(meshPath.toStdString());
+}
+
+std::vector<mitk::Point3D> CemrgStrains::ConvertMPS(mitk::DataNode::Pointer node) {
+
+    std::vector<mitk::Point3D> points;
+    mitk::BaseData::Pointer data = node->GetData();
+    mitk::PointSet::Pointer set = dynamic_cast<mitk::PointSet*>(data.GetPointer());
+
+    if (set.IsNull())
+        return points;
+    for (mitk::PointSet::PointsIterator it = set->Begin(); it != set->End(); ++it) {
+        mitk::Point3D point;
+        point.SetElement(0, it.Value().GetElement(0));
+        point.SetElement(1, it.Value().GetElement(1));
+        point.SetElemen
