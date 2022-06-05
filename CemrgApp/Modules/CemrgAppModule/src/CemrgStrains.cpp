@@ -914,4 +914,107 @@ mitk::Point3D CemrgStrains::Circlefit3d(mitk::Point3D point1, mitk::Point3D poin
         v2n.GetElement(2) * v1n.GetElement(2);
 
     mitk::Point3D v2nb = v2n;
-    for (int
+    for (int i = 0; i < 3; i++) {
+        v2nb.SetElement(i, v2nb.GetElement(i) - dotp * v1n.GetElement(i));
+    }
+
+    //Normalize v2nb
+    double l2nb = sqrt(pow(v2nb.GetElement(0), 2) + pow(v2nb.GetElement(1), 2) + pow(v2nb.GetElement(2), 2));
+    for (int i = 0; i < 3; i++) {
+        v2nb.SetElement(i, v2nb.GetElement(i) / l2nb);
+    }
+
+    //Calculate 2d coordinates of points in each plane
+    mitk::Point2D p3_2d;
+    p3_2d.SetElement(0, 0);
+    p3_2d.SetElement(1, 0);
+    for (int i = 0; i < 3; i++) {
+        p3_2d.SetElement(0, p3_2d.GetElement(0) + v2.GetElement(i) * v1n.GetElement(i));
+        p3_2d.SetElement(1, p3_2d.GetElement(1) + v2.GetElement(i) * v2nb.GetElement(i));
+    }
+
+    //Calculate the fitting circle
+    double a = l1;
+    double b = p3_2d.GetElement(0);
+    double c = p3_2d.GetElement(1);
+    double t = .5 * (a - b) / c;
+    double scale1 = b / 2 + c * t;
+    double scale2 = c / 2 - b * t;
+
+    //centre
+    mitk::Point3D centre;
+    for (int i = 0; i < 3; i++) {
+        double val = point1.GetElement(i) + (scale1 * v1n.GetElement(i)) + (scale2 * v2nb.GetElement(i));
+        centre.SetElement(i, val);
+    }
+    // qDebug() << centre.GetElement(0) << centre.GetElement(1) << centre.GetElement(2);
+
+    /*radius
+    double radius = sqrt(pow(centre.GetElement(0) - point1.GetElement(0),2) +
+                         pow(centre.GetElement(1) - point1.GetElement(1),2) +
+                         pow(centre.GetElement(2) - point1.GetElement(2),2));*/
+    return centre;
+}
+
+mitk::Matrix<double, 3, 3> CemrgStrains::CalcRotationMatrix(mitk::Point3D point1, mitk::Point3D point2) {
+
+    //X Axis
+    mitk::Matrix<double, 1, 3> vec;
+    vec[0][0] = point1.GetElement(0);
+    vec[0][1] = point1.GetElement(1);
+    vec[0][2] = point1.GetElement(2);
+    double theta_x = atan(vec[0][1] / vec[0][2]);
+
+    mitk::Matrix<double, 3, 3> R_x;
+    R_x[0][0] = 1;
+    R_x[0][1] = 0;
+    R_x[0][2] = 0;
+    R_x[1][0] = 0;
+    R_x[1][1] = cos(theta_x);
+    R_x[1][2] = -sin(theta_x);
+    R_x[2][0] = 0;
+    R_x[2][1] = sin(theta_x);
+    R_x[2][2] = cos(theta_x);
+
+    //Y Axis
+    mitk::Matrix<double, 3, 1> vecX;
+    vecX = R_x * vec.GetTranspose();
+    double theta_y = atan(-vecX[0][0] / vecX[2][0]);
+
+    mitk::Matrix<double, 3, 3> R_y;
+    R_y[0][0] = cos(theta_y);
+    R_y[0][1] = 0;
+    R_y[0][2] = sin(theta_y);
+    R_y[1][0] = 0;
+    R_y[1][1] = 1;
+    R_y[1][2] = 0;
+    R_y[2][0] = -sin(theta_y);
+    R_y[2][1] = 0;
+    R_y[2][2] = cos(theta_y);
+
+    //Z Axis
+    point2 = RotatePoint(R_y * R_x, point2);
+    double theta_z = atan(-point2.GetElement(1) / point2.GetElement(0));
+
+    mitk::Matrix<double, 3, 3> R_z;
+    R_z[0][0] = cos(theta_z);
+    R_z[0][1] = -sin(theta_z);
+    R_z[0][2] = 0;
+    R_z[1][0] = sin(theta_z);
+    R_z[1][1] = cos(theta_z);
+    R_z[1][2] = 0;
+    R_z[2][0] = 0;
+    R_z[2][1] = 0;
+    R_z[2][2] = 1;
+
+    //Rotation Matrix
+    mitk::Matrix<double, 3, 3> R;
+    R = R_z * R_y * R_x;
+    return R;
+}
+
+void CemrgStrains::AssignpLabels(int layer, std::vector<double>& pLabel, std::vector<int> index, std::vector<double> pAngles, double sepA, double freeA) {
+
+    double Csec;
+    std::vector<int> oLab;
+    std::vector<doubl
