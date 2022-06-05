@@ -1017,4 +1017,82 @@ void CemrgStrains::AssignpLabels(int layer, std::vector<double>& pLabel, std::ve
 
     double Csec;
     std::vector<int> oLab;
-    std::vector<doubl
+    std::vector<double> WID;
+
+    //Create scaler
+    //double SCAL = angles.size() / 16.0;
+
+    if (layer == 0) {
+        Csec = 0;
+        oLab = {3, 2, 1, 6, 5, 4};
+        WID = {sepA, sepA, freeA, freeA, freeA, freeA};
+    } else if (layer == 1) {
+        Csec = 0;
+        oLab = {9, 8, 7, 12, 11, 10};
+        WID = {sepA, sepA, freeA, freeA, freeA, freeA};
+    } else if (layer == 2) {
+        Csec = sepA - M_PI / 4;
+        oLab = {14, 13, 16, 15};
+        WID = {M_PI / 2, M_PI / 2, M_PI / 2, M_PI / 2};
+    }//_if
+
+    for (unsigned int i = 0; i < oLab.size(); i++) {
+        double Upper = Csec + WID.at(i);
+        double Lower = Csec;
+        for (unsigned int idx = 0; idx < pAngles.size(); idx++) {
+            int logic = (pAngles.at(idx) < Upper ? 1 : 0) * (pAngles.at(idx) >= Lower ? 1 : 0) * index.at(idx);
+            logic == 1 ? pLabel.at(idx) = oLab.at(i) : false;// * SCAL;
+        }
+        if (Lower < 0) {
+            for (unsigned int idx = 0; idx < pAngles.size(); idx++) {
+                int logic = (pAngles.at(idx) < 2 * M_PI ? 1 : 0) * (pAngles.at(idx) >= 2 * M_PI + Lower ? 1 : 0) * index.at(idx);
+                logic == 1 ? pLabel.at(idx) = oLab.at(i) : false;// * SCAL;
+            }
+        }
+        if (Upper > 2 * M_PI) {
+            for (unsigned int idx = 0; idx < pAngles.size(); idx++) {
+                int logic = (pAngles.at(idx) < Upper - 2 * M_PI ? 1 : 0) * (pAngles.at(idx) >= 0 ? 1 : 0) * index.at(idx);
+                logic == 1 ? pLabel.at(idx) = oLab.at(i) : false;// * SCAL;
+            }
+        }
+        Csec = Csec + WID.at(i);
+    }//_for
+}
+
+void CemrgStrains::AssigncLabels(
+    int layer, std::vector<int>& cLabel, std::vector<int> index, std::vector<double> cAngles, double sepA, double freeA) {
+
+    double Csec;
+    std::vector<int> oLab;
+    std::vector<double> WID;
+
+    if (layer == 0) {
+        Csec = 0;
+        oLab = {3, 2, 1, 6, 5, 4};
+        WID = {sepA, sepA, freeA, freeA, freeA, freeA};
+    } else if (layer == 1) {
+        Csec = 0;
+        oLab = {9, 8, 7, 12, 11, 10};
+        WID = {sepA, sepA, freeA, freeA, freeA, freeA};
+    } else if (layer == 2) {
+        Csec = sepA - M_PI / 4;
+        oLab = {14, 13, 16, 15};
+        WID = {M_PI / 2, M_PI / 2, M_PI / 2, M_PI / 2};
+    }//_if
+
+    for (unsigned int i = 0; i < oLab.size(); i++) {
+        double Upper = Csec + WID.at(i);
+        double Lower = Csec;
+        for (unsigned int idx = 0; idx < cAngles.size(); idx++) {
+            int logic = (cAngles.at(idx) < Upper ? 1 : 0) * (cAngles.at(idx) >= Lower ? 1 : 0) * index.at(idx);
+            logic == 1 ? cLabel.at(idx) = oLab.at(i) : false;
+        }
+        if (Lower < 0) {
+            for (unsigned int idx = 0; idx < cAngles.size(); idx++) {
+                int logic = (cAngles.at(idx) < 2 * M_PI ? 1 : 0) * (cAngles.at(idx) >= 2 * M_PI + Lower ? 1 : 0) * index.at(idx);
+                logic == 1 ? cLabel.at(idx) = oLab.at(i) : false;
+            }
+        }
+        if (Upper > 2 * M_PI) {
+            for (unsigned int idx = 0; idx < cAngles.size(); idx++) {
+                int logic = (cAngles.at(idx) < Upper - 2 * M_PI ? 1 : 0) * (cAngles.at(idx) >= 0
