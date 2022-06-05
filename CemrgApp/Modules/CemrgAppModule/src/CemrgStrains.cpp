@@ -827,4 +827,91 @@ std::vector<mitk::Point3D> CemrgStrains::ConvertMPS(mitk::DataNode::Pointer node
         mitk::Point3D point;
         point.SetElement(0, it.Value().GetElement(0));
         point.SetElement(1, it.Value().GetElement(1));
-        point.SetElemen
+        point.SetElement(2, it.Value().GetElement(2));
+        points.push_back(point);
+    }//for
+
+    return points;
+}
+
+double CemrgStrains::Norm(mitk::Point3D vec) {
+
+    double norm;
+    norm = sqrt(pow(double(vec.GetElement(0)), 2.0) +
+        pow(double(vec.GetElement(1)), 2.0) +
+        pow(double(vec.GetElement(2)), 2.0));
+    return norm;
+}
+
+double CemrgStrains::Dot(mitk::Point3D vec1, mitk::Point3D vec2) {
+
+    double dot;
+    dot = ((vec1.GetElement(0) * vec2.GetElement(0)) +
+        (vec1.GetElement(1) * vec2.GetElement(1)) +
+        (vec1.GetElement(2) * vec2.GetElement(2)));
+    return dot;
+}
+
+mitk::Point3D CemrgStrains::Cross(mitk::Point3D vec1, mitk::Point3D vec2) {
+
+    mitk::Point3D product;
+    product.SetElement(0, vec1.GetElement(1) * vec2.GetElement(2) - vec1.GetElement(2) * vec2.GetElement(1));
+    product.SetElement(1, vec1.GetElement(2) * vec2.GetElement(0) - vec1.GetElement(0) * vec2.GetElement(2));
+    product.SetElement(2, vec1.GetElement(0) * vec2.GetElement(1) - vec1.GetElement(1) * vec2.GetElement(0));
+    return product;
+}
+
+std::vector<double> CemrgStrains::GetMinMax(vtkSmartPointer<vtkPolyData> pd, int dimension) {
+
+    double min = 0;
+    double max = 0;
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        double* point = pd->GetPoint(i);
+        if (i == 0) {
+            min = point[dimension];
+            max = point[dimension];
+        } else {
+            if (point[dimension] < min)
+                min = point[dimension];
+            if (point[dimension] > max)
+                max = point[dimension];
+        }//_if
+    }//_for
+    return std::vector<double>{min, max};
+}
+
+mitk::Point3D CemrgStrains::Circlefit3d(mitk::Point3D point1, mitk::Point3D point2, mitk::Point3D point3) {
+
+    //v1, v2 describe the vectors from p1 to p2 and p3, resp.
+    mitk::Point3D v1;
+    mitk::Point3D v2;
+    for (int i = 0; i < 3; i++) {
+        v1.SetElement(i, point2.GetElement(i) - point1.GetElement(i));
+        v2.SetElement(i, point3.GetElement(i) - point1.GetElement(i));
+    }
+
+    //l1, l2 describe the lengths of those vectors
+    double l1 = sqrt(pow(v1.GetElement(0), 2) + pow(v1.GetElement(1), 2) + pow(v1.GetElement(2), 2));
+    double l2 = sqrt(pow(v2.GetElement(0), 2) + pow(v2.GetElement(1), 2) + pow(v2.GetElement(2), 2));
+
+    //v1n, v2n describe the normalized vectors v1 and v2
+    mitk::Point3D v1n = v1;
+    mitk::Point3D v2n = v2;
+    for (int i = 0; i < 3; i++) {
+        v1n.SetElement(i, v1n.GetElement(i) / l1);
+        v2n.SetElement(i, v2n.GetElement(i) / l2);
+    }
+
+    //nv describes the normal vector on the plane of the circle
+    mitk::Point3D nv;
+    nv.SetElement(0, v1n.GetElement(1) * v2n.GetElement(2) - v1n.GetElement(2) * v2n.GetElement(1));
+    nv.SetElement(1, v1n.GetElement(2) * v2n.GetElement(0) - v1n.GetElement(0) * v2n.GetElement(2));
+    nv.SetElement(2, v1n.GetElement(0) * v2n.GetElement(1) - v1n.GetElement(1) * v2n.GetElement(0));
+
+    //v2nb: orthogonalization of v2n against v1n
+    double dotp = v2n.GetElement(0) * v1n.GetElement(0) +
+        v2n.GetElement(1) * v1n.GetElement(1) +
+        v2n.GetElement(2) * v1n.GetElement(2);
+
+    mitk::Point3D v2nb = v2n;
+    for (int
