@@ -1095,4 +1095,10 @@ void CemrgStrains::AssigncLabels(
         }
         if (Upper > 2 * M_PI) {
             for (unsigned int idx = 0; idx < cAngles.size(); idx++) {
-                int logic = (cAngles.at(idx) < Upper - 2 * M_PI ? 1 : 0) * (cAngles.at(idx) >= 0
+                int logic = (cAngles.at(idx) < Upper - 2 * M_PI ? 1 : 0) * (cAngles.at(idx) >= 0 ? 1 : 0) * index.at(idx);
+                logic == 1 ? cLabel.at(idx) = oLab.at(i) : false;
+            }
+        }
+        Csec = Csec + WID.at(i);
+    }//_for
+}
