@@ -203,4 +203,45 @@ void TestCemrgMeasure::calcSurfaceMesh() {
 }
 
 
-/******************************************************
+/*****************************************************************************************************/
+/***************************************  Conversion Functions ***************************************/
+/*****************************************************************************************************/
+constexpr size_t conversionDataSize = 5;
+
+const array<const string, conversionDataSize> conversionFileData {
+    "# vtk DataFile Version 4.2\nvtk output\nASCII\nDATASET POLYDATA\nPOINTS 12 float\n2.84457 7.69388 30.6308 2.89832 7.45175 30.697 2.99997 6.97862 30.814 \n3.08689 6.58059 30.9175 3.12502 6.39859 30.959 3.23261 5.9521 31.1119 \n3.26323 5.83054 31.1584 3.27528 5.77604 31.1731 3.34243 5.48657 31.2628 \n3.43975 5.07282 31.3958 3.54421 4.63671 31.5429 3.61901 4.32759 31.6499 \n",
+    "# vtk DataFile Version 4.2\nvtk output\nASCII\nDATASET POLYDATA\nPOINTS 5 float\n37.7279 5.9931 23.0381 37.9221 6.38497 22.7362 38.1279 6.98015 22.4036\n38.1583 7.11666 22.3511 38.3233 7.97394 22.0579",
+    "# vtk DataFile Version 4.2\nvtk output\nASCII\nDATASET POLYDATA\nPOINTS 3 float\n19.7627 4.36692 23.3719 19.7856 3.95139 23.4737 19.7912 3.83002 23.5085",
+    "# vtk DataFile Version 4.2\nvtk output\nASCII\nDATASET POLYDATA\nPOINTS 2 float\n37.7279 5.9931 23.0381 37.9221 6.38497 22.7362 \n",
+    "# vtk DataFile Version 4.2\nvtk output\nASCII\nDATASET POLYDATA\nPOINTS 4 float\n2.84457 7.69388 30.6308 2.89832 7.45175 30.697 2.99997 6.97862 30.814 \n3.08689 6.58059 30.9175\n"
+};
+
+const array<const Points, conversionDataSize> conversionPointData { {
+    { {-2.84457, -7.69388, 30.6308}, {-2.89832, -7.45175, 30.697}, {-2.99997, -6.97862, 30.814}, {-3.08689, -6.58059, 30.9175}, {-3.12502, -6.39859, 30.959}, {-3.23261, -5.9521, 31.1119}, {-3.26323, -5.83054, 31.1584}, {-3.27528, -5.77604, 31.1731}, {-3.34243, -5.48657, 31.2628}, {-3.43975, -5.07282, 31.3958}, {-3.54421, -4.63671, 31.5429}, {-3.61901, -4.32759, 31.6499} },
+    { {-37.7279, -5.9931, 23.0381}, {-37.9221, -6.38497, 22.7362}, {-38.1279, -6.98015, 22.4036}, {-38.1583, -7.11666, 22.3511}, {-38.3233, -7.97394, 22.0579} },
+    { {-19.7627, -4.36692, 23.3719}, {-19.7856, -3.95139, 23.4737}, {-19.7912, -3.83002, 23.5085} },
+    { {-37.7279, -5.9931, 23.0381}, {-37.9221, -6.38497, 22.7362} },
+    { {-2.84457, -7.69388, 30.6308}, {-2.89832, -7.45175, 30.697}, {-2.99997, -6.97862, 30.814}, {-3.08689, -6.58059, 30.9175} }
+} };
+
+void TestCemrgMeasure::Convert_data() {
+    QTest::addColumn<QString>("dir");
+    QTest::addColumn<mitk::DataNode::Pointer>("dataNode");
+    QTest::addColumn<string>("result");
+
+    const QString dir = "./";
+
+    // Create DataNodes
+    array<mitk::DataNode::Pointer, conversionDataSize> dataNode;
+    for (size_t i = 0; i < conversionDataSize; i++) {
+        mitk::PointSet::Pointer pointSet = mitk::PointSet::New();
+        for (size_t j = 0; j < conversionPointData[i].size(); j++) {
+            mitk::Point3D point;
+            tie(point[0], point[1], point[2]) = conversionPointData[i][j];
+            pointSet->InsertPoint(point);
+        }
+        dataNode[i] = mitk::DataNode::New();
+        dataNode[i]->SetData(pointSet);
+    }
+
+    for (size_t i = 0; i 
