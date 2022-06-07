@@ -244,4 +244,65 @@ void TestCemrgMeasure::Convert_data() {
         dataNode[i]->SetData(pointSet);
     }
 
-    for (size_t i = 0; i 
+    for (size_t i = 0; i < conversionDataSize; i++)
+        QTest::newRow(("Test " + to_string(i + 1)).c_str()) << dir << dataNode[i] << conversionFileData[i];
+}
+
+void TestCemrgMeasure::Convert() {
+    QFETCH(QString, dir);
+    QFETCH(mitk::DataNode::Pointer, dataNode);
+    QFETCH(string, result);
+
+    cemrgMeasure->Convert(dir, dataNode);
+
+    // Compare the created file with result
+    ifstream convertedFile;
+    convertedFile.open(dir.toStdString() + "input.vtk");
+    QVERIFY(convertedFile.is_open());
+    istringstream resultFile(result);
+
+    // Skip first lines
+    string convertedLine, resultLine;
+    getline(convertedFile, convertedLine); getline(resultFile, resultLine);
+    QVERIFY(convertedFile.good());
+
+    for (int i = 2; convertedFile.good() && resultFile.good(); i++) {
+        getline(convertedFile, convertedLine);
+        getline(resultFile, resultLine);
+        QVERIFY2(QString(convertedLine.c_str()).trimmed() == QString(resultLine.c_str()).trimmed(), ("Line " + to_string(i) + " doesn't match!").c_str());
+    }
+}
+
+void TestCemrgMeasure::Deconvert_data() {
+    QTest::addColumn<QString>("dir");
+    QTest::addColumn<int>("fileNo");
+    QTest::addColumn<Points>("result");
+
+    const QString dir = "./";
+
+    // Write test data into files
+    for (size_t i = 0; i < conversionDataSize; i++) {
+        ofstream file;
+        file.open(dir.toStdString() + "/transformed-" + to_string(i) + ".vtk");
+        file << conversionFileData[i];
+    }
+
+    for (size_t i = 0; i < conversionDataSize; i++)
+        QTest::newRow(("Test " + to_string(i + 1)).c_str()) << dir << (int)i << conversionPointData[i];
+}
+
+void TestCemrgMeasure::Deconvert() {
+    QFETCH(QString, dir);
+    QFETCH(int, fileNo);
+    QFETCH(Points, result);
+
+    QCOMPARE(cemrgMeasure->Deconvert(dir, fileNo), result);
+}
+
+int CemrgMeasureTest(int argc, char *argv[]) {
+    QCoreApplication app(argc, argv);
+    app.setAttribute(Qt::AA_Use96Dpi, true);
+    TestCemrgMeasure tc;
+    QTEST_SET_MAIN_SOURCE_PATH
+    return QTest::qExec(&tc, argc, argv);
+}
