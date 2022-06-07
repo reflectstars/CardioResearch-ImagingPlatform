@@ -206,4 +206,54 @@ void TestCemrgStrains::ReferenceGuideLines_data() {
 
     for (size_t i = 0; i < referenceGuideLinesData.size(); i++) {
         // Prepare the input
-        mitk::PointSet::Pointer pointS
+        mitk::PointSet::Pointer pointSet = mitk::PointSet::New();
+        mitk::Point3D point;
+        for (auto& pt : pointSetData[i]) {
+            tie(point[0], point[1], point[2]) = pt;
+            pointSet->InsertPoint(point);
+        }
+        mitk::DataNode::Pointer lmNode = mitk::DataNode::New();
+        lmNode->SetData(pointSet);
+
+        // Prepare the output
+        vector<mitk::Surface::Pointer> surfaces;
+        for (size_t j = 0; j < referenceGuideLinesData[i].size(); j++) {
+            vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
+            lineSource->SetPoint1(referenceGuideLinesData[i][j][0][0], referenceGuideLinesData[i][j][0][1], referenceGuideLinesData[i][j][0][2]);
+            lineSource->SetPoint2(referenceGuideLinesData[i][j][1][0], referenceGuideLinesData[i][j][1][1], referenceGuideLinesData[i][j][1][2]);
+            lineSource->Update();
+            mitk::Surface::Pointer surface = mitk::Surface::New();
+            surface->SetVtkPolyData(lineSource->GetOutput());
+            surfaces.push_back(surface);
+        }
+
+        QTest::newRow(("Test " + to_string(i + 1)).c_str()) << lmNode << surfaces;
+    }
+}
+
+void TestCemrgStrains::ReferenceGuideLines() {
+    QFETCH(mitk::DataNode::Pointer, lmNode);
+    QFETCH(vector<mitk::Surface::Pointer>, result);
+
+    // for (auto& surface : cemrgStrains->ReferenceGuideLines(lmNode)) {
+    //     for (size_t i = 0; i < surface->GetSizeOfPolyDataSeries(); i++) {
+    //         for (int j = 0; j < surface->GetVtkPolyData(i)->GetPoints()->GetNumberOfPoints(); j++) {
+    //             double point[3];
+    //             surface->GetVtkPolyData(i)->GetPoints()->GetPoint(j, point);
+    //             qDebug() << fixed << qSetRealNumberPrecision(20) << point[0] << point[1] << point[2];
+    //         }
+    //     }
+    // }
+    
+    auto referenceGuideLines = cemrgStrains->ReferenceGuideLines(lmNode);
+    for (size_t i = 0; i < result.size(); i++)
+        QVERIFY(mitk::Equal(*referenceGuideLines[i], *result[i], mitk::eps, true));
+}
+
+int CemrgStrainsTest(int argc, char *argv[]) {
+    QCoreApplication app(argc, argv);
+    app.setAttribute(Qt::AA_Use96Dpi, true);
+    TestCemrgStrains tc;
+    QTEST_SET_MAIN_SOURCE_PATH
+    return QTest::qExec(&tc, argc, argv);
+}
