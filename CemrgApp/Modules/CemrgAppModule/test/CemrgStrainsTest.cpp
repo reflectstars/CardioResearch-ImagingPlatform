@@ -103,4 +103,88 @@ void TestCemrgStrains::CalculateStrainsPlot_data() {
 
     const array<vector<double>, CemrgTestData::strainDataSize> strainsPlotData { {
         {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-        {-0.45874886139987286482, -0.38998985665445839999, -0.39095134301528899901, -0.45061430609189162544, -0.48968384803220571522, -0.49392625117662009027, -0.45850249287033251200, -0.35280369788968640732, -0.35498114762612859030, -0.44960627315573070684, -0.49382093507974794688, -0.49665076176258193819, -0.31543513441107573492, -0.43
+        {-0.45874886139987286482, -0.38998985665445839999, -0.39095134301528899901, -0.45061430609189162544, -0.48968384803220571522, -0.49392625117662009027, -0.45850249287033251200, -0.35280369788968640732, -0.35498114762612859030, -0.44960627315573070684, -0.49382093507974794688, -0.49665076176258193819, -0.31543513441107573492, -0.43614002435635201849, -0.32295055120045534913, -0.46667719896202092267}
+    } };
+
+    // Preparation for tests
+    mitk::DataNode::Pointer lmNode = ReferenceAHA();
+
+    for (size_t i = 0; i < strainsPlotData.size(); i++)
+        QTest::newRow(("Test " + to_string(i + 1)).c_str()) << (int)i << lmNode << (int)i << strainsPlotData[i];
+}
+
+void TestCemrgStrains::CalculateStrainsPlot() {
+    QFETCH(int, meshNo);
+    QFETCH(mitk::DataNode::Pointer, lmNode);
+    QFETCH(int, flag);
+    QFETCH(vector<double>, result);
+
+    QVERIFY(equal(begin(result), end(result), begin(cemrgStrains->CalculateStrainsPlot(meshNo, lmNode, flag)), FuzzyCompare));
+}
+
+void TestCemrgStrains::CalculateSDI_data() {
+    QTest::addColumn<vector<vector<double>>>("valueVectors");
+    QTest::addColumn<int>("cycleLengths");
+    QTest::addColumn<int>("noFrames");
+    QTest::addColumn<double>("result");
+
+    const array<double, 5> sdiData {
+        0,
+        25,
+        16.65,
+        12.5,
+        10
+    };
+    
+    // Preparation for tests
+    ReferenceAHA();
+
+    vector<vector<double>> valueVectors;
+    for (size_t i = 0; i < sdiData.size(); i++) {
+        valueVectors.push_back(cemrgStrains->CalculateSqzPlot(i % CemrgTestData::strainDataSize));
+        QTest::newRow(("Test " + to_string(i + 1)).c_str()) << valueVectors << 1000 << (int)i + 1 << sdiData[i];
+    }
+}
+
+void TestCemrgStrains::CalculateSDI() {
+    QFETCH(vector<vector<double>>, valueVectors);
+    QFETCH(int, cycleLengths);
+    QFETCH(int, noFrames);
+    QFETCH(double, result);
+
+    QCOMPARE(cemrgStrains->CalculateSDI(valueVectors, cycleLengths, noFrames), result);
+}
+
+void TestCemrgStrains::ReferenceGuideLines_data() {
+    QTest::addColumn<mitk::DataNode::Pointer>("lmNode");
+    QTest::addColumn<vector<mitk::Surface::Pointer>>("result");
+
+    const array<vector<tuple<double, double, double>>, 5> pointSetData { {
+        {
+            {85.4995566059, 85.6483483021, 91.9406230158},
+            {23.1505777288, 132.670464778, 141.375157912},
+            {44.8106937268, 158.193900374, 135.289413785},
+            {20.4255620648, 144.034012592, 115.474941806}
+        },
+        {
+            {85.4995566059, 85.6483483021, 91.9406230158},
+            {23.1505777288, 132.670464778, 141.375157912},
+            {44.8106937268, 158.193900374, 135.289413785},
+            {20.4255620648, 144.034012592, 115.474941806},
+            {37.8195032758, 119.896131031, 91.3032690028},
+            {49.2203653858, 104.544360923, 140.767393939}
+        },
+        {
+            {-44.8106937268, -158.193900374, -135.289413785},
+            {20.4255620648, 144.034012592, 115.474941806},
+            {-37.8195032758, -119.896131031, -91.3032690028},
+            {49.2203653858, 104.544360923, 140.767393939}
+        },
+        {
+            {-85.4995566059, 85.6483483021, -91.9406230158},
+            {-23.1505777288, -132.670464778, -141.375157912},
+            {37.8195032758, 119.896131031, 91.3032690028},
+            {49.2203653858, -104.544360923, 140.767393939}
+        },
+        {
+            {20.4255620648, 
