@@ -1,3 +1,4 @@
+
 /*=========================================================================
 
 Program:   Medical Imaging & Interaction Toolkit
@@ -26,6 +27,42 @@ PURPOSE.  See the above copyright notices for more information.
  *
 =========================================================================*/
 
-#include "CemrgTestCommon.hpp"
+// C++ Standard
+#include <vector>
+#include <tuple>
+#include <string>
+#include <array>
+#include <utility>
+#include <memory>
 
-constexpr decltype(CemrgTestData::surfacePaths) CemrgTestData::surfacePaths;
+// Qt
+#include <QtTest/QtTest>
+#include <QFileInfo>
+
+// Qmitk
+#include <mitkIOUtil.h>
+#include <mitkTestingConfig.h>
+#include <mitkDataNode.h>
+#include <mitkImageCast.h>
+#include <mitkImagePixelReadAccessor.h>
+
+// VTK
+#include <vtkPolyDataNormals.h>
+#include <vtkLineSource.h>
+
+using namespace std;
+
+struct CemrgTestData {
+    static constexpr array<const char*, 5> surfacePaths {
+        "Data/Surface/Book.stl",
+        "Data/Surface/ClaronTool.stl",
+        "Data/Surface/EMTool.stl",
+        "Data/Surface/ball.stl",
+        "Data/Surface/binary.stl"
+    };
+
+    static constexpr const char *strainPath = "Data/Strain";
+    static constexpr size_t strainDataSize = 2;
+
+    static constexpr const char *cmdLinePath = "Data/CommandLine";
+};
