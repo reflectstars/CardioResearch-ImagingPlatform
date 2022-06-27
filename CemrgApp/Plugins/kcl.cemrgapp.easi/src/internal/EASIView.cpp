@@ -251,4 +251,79 @@ void EASIView::CropinIMGS() {
         CemrgCommonUtils::AddToStorage(outputImage, CemrgCommonUtils::GetImageNode()->GetName(), this->GetDataStorage());
         this->GetDataStorage()->Remove(CemrgCommonUtils::GetImageNode());
         this->GetDataStorage()->Remove(CemrgCommonUtils::GetCuttingNode());
-        mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->Get
+        mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+        m_Controls.button_2_2->setText("Crop Images");
+        return;
+    }//_if
+
+    //Prepare cutting cuboid
+    mitk::Cuboid::Pointer cuttingObject = mitk::Cuboid::New();
+    mitk::DataNode::Pointer cuttingNode = mitk::DataNode::New();
+    cuttingNode->SetData(cuttingObject);
+    cuttingNode->SetProperty("opacity", mitk::FloatProperty::New(0.4));
+    cuttingNode->SetProperty("color", mitk::ColorProperty::New(1.0, 1.0, 0.0));
+    cuttingNode->SetProperty("name", mitk::StringProperty::New("Cropper"));
+    this->GetDataStorage()->Add(cuttingNode);
+
+    //Mouse interactions
+    mitk::AffineImageCropperInteractor::Pointer affineDataInteractor = mitk::AffineImageCropperInteractor::New();
+    affineDataInteractor->LoadStateMachine("ClippingPlaneInteraction3D.xml", us::ModuleRegistry::GetModule("MitkDataTypesExt"));
+    affineDataInteractor->SetEventConfig("CropperDeformationConfig.xml", us::ModuleRegistry::GetModule("MitkDataTypesExt"));
+    affineDataInteractor->SetDataNode(cuttingNode);
+    cuttingNode->SetBoolProperty("pickable", true);
+
+    //Fit the cuboid to the image
+    mitk::Image::Pointer imageToCut;
+    mitk::BoundingObject::Pointer cuttingCube;
+    mitk::DataNode::Pointer imageNode = nodes.at(0);
+    mitk::BaseData::Pointer data = imageNode->GetData();
+    cuttingCube = dynamic_cast<mitk::BoundingObject*>(cuttingNode->GetData());
+    if (data) {
+        //Test if this data item is an image
+        imageToCut = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (imageToCut)
+            cuttingCube->FitGeometry(imageToCut->GetGeometry());
+        else return;
+    } else return;
+
+    //To be used for actual cutting
+    CemrgCommonUtils::SetImageToCut(imageToCut);
+    CemrgCommonUtils::SetCuttingCube(cuttingCube);
+    CemrgCommonUtils::SetImageNode(imageNode);
+    CemrgCommonUtils::SetCuttingNode(cuttingNode);
+    m_Controls.button_2_2->setText("Are you done?");
+}
+
+void EASIView::ResampIMGS() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please select an image from the Data Manager to perform downsampling!");
+        return;
+    }
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Find the selected node
+    QString path;
+    mitk::DataNode::Pointer imgNode = nodes.at(0);
+    mitk::BaseData::Pointer data = imgNode->GetData();
+    if (data) {
+
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+   
