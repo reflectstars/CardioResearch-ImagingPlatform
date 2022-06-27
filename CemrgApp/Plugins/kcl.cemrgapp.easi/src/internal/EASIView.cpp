@@ -326,4 +326,89 @@ void EASIView::ResampIMGS() {
 
         //Test if this data item is an image
         mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
-   
+        if (image) {
+
+            bool ok;
+            int factor = QInputDialog::getInt(NULL, tr("Downsampling"), tr("By factor of:"), 3, 1, 5, 1, &ok);
+            if (ok) {
+
+                //Downsample selected image
+                this->BusyCursorOn();
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+                mitk::Image::Pointer outputImage = CemrgCommonUtils::Downsample(image, factor);
+                path = directory + "/" + imgNode->GetName().c_str() + ".nii";
+                mitk::IOUtil::Save(outputImage, path.toStdString());
+                mitk::ProgressBar::GetInstance()->Progress();
+                this->BusyCursorOff();
+
+                //Update datastorage
+                CemrgCommonUtils::AddToStorage(outputImage, imgNode->GetName(), this->GetDataStorage());
+                this->GetDataStorage()->Remove(imgNode);
+                mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+            }//_if
+        } else
+            return;
+    } else
+        return;
+}
+
+void EASIView::SegmentIMGS() {
+
+    int reply = QMessageBox::question(
+        NULL, "Question", "Do you have a segmentation to load?",
+        QMessageBox::Yes, QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+
+        QString path = QFileDialog::getOpenFileName(
+            NULL, "Open Segmentation file", mitk::IOUtil::GetProgramPath().c_str(),
+            QmitkIOUtil::GetFileOpenFilterString());
+        if (path.isEmpty())
+            return;
+        mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+        mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+    } else {
+        //Show the plugin
+        this->GetSite()->GetPage()->ShowView("org.mitk.views.segmentation");
+    }//_if
+}
+
+void EASIView::BrowseM() {
+
+    QString para = "";
+    para = QFileDialog::getOpenFileName(
+        NULL, "Open text file containing parameters",
+        directory, QmitkIOUtil::GetFileOpenFilterString());
+    m_UIMeshing.lineEdit_1->setText(para);
+}
+
+void EASIView::CreateMesh() {
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please select a segmentation from the Data Manager to create a mesh!");
+        return;
+    }
+
+    //Find the selected node
+    mitk::Point3D origin;
+    mitk::DataNode::Pointer segNode = nodes.at(0);
+    mitk::BaseData::Pointer data = segNode->GetData();
+  
