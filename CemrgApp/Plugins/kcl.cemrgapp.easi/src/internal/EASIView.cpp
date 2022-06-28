@@ -549,4 +549,72 @@ void EASIView::ConfrmSITE() {
 
         //Prepare activation sphere
         mitk::DataNode::Pointer actiNode = mitk::DataNode::New();
-        mitk::Ellipsoid::Po
+        mitk::Ellipsoid::Pointer actiObject = mitk::Ellipsoid::New();
+        actiNode->SetData(actiObject);
+        actiNode->SetProperty("opacity", mitk::FloatProperty::New(0.4));
+        actiNode->SetProperty("color", mitk::ColorProperty::New(1.0, 0.0, 0.0));
+        actiNode->SetProperty("name", mitk::StringProperty::New("Activation Sites"));
+        this->GetDataStorage()->Add(actiNode);
+
+        //Set size of activation site
+        mitk::Point3D scale;
+        scale[0] = scaleFactor; scale[1] = scaleFactor; scale[2] = scaleFactor;
+        actiObject->SetOrigin(pstObje->GetPoint(0));
+        mitk::Point3D anchorPoint = actiObject->GetGeometry()->GetCenter();
+        mitk::ScaleOperation* doOp = new mitk::ScaleOperation(mitk::OpSCALE, scale, anchorPoint);
+        actiObject->GetGeometry()->ExecuteOperation(doOp);
+        mitk::RenderingManager::GetInstance()->RequestUpdateAll();
+
+    } else {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please select a pointset from the Data Manager to confirm the activation site!");
+        return;
+    }//_if
+}
+
+#include "CemrgStrains.h"
+void EASIView::Simulation() {
+
+    std::string line;
+    ifstream file("/home/or15/Work/Strain/ResolutionStudy/paths.txt");
+
+    if (file.is_open()) {
+        while (getline(file, line)) {
+
+            QString directory = QString::fromStdString(line);
+            QString chamber = directory.mid(54, 2);
+            MITK_INFO << directory;
+
+            if (chamber == "LV") {
+
+                QString lmPaths = "/home/or15/Work/Strain/ResolutionStudy/Dataset/" + directory.mid(50, 3) + "/PointSet.mps";
+                mitk::DataNode::Pointer lmNode = mitk::DataNode::New();
+                lmNode->SetData(mitk::IOUtil::Load<mitk::PointSet>(lmPaths.toStdString()));
+
+                int segRatios[3] = {40, 40, 20};
+                std::unique_ptr<CemrgStrains> strain1;
+                strain1 = std::unique_ptr<CemrgStrains>(new CemrgStrains(directory, 0));
+                strain1->ReferenceAHA(lmNode, segRatios, false);
+                std::vector<std::vector<double>> plotValueVectorsSQZ;
+                std::vector<std::vector<double>> plotValueVectorsCRC;
+                std::vector<std::vector<double>> plotValueVectorsLNG;
+
+                for (int j = 0; j < 10; j++) {
+                    plotValueVectorsSQZ.push_back(strain1->CalculateSqzPlot(j));
+                    plotValueVectorsCRC.push_back(strain1->CalculateStrainsPlot(j, lmNode, 3));
+                    plotValueVectorsLNG.push_back(strain1->CalculateStrainsPlot(j, lmNode, 4));
+                }
+
+                for (int j = 0; j < 3; j++) {
+                    QString fileName;
+                    std::vector<std::vector<double>> plotValueVectors;
+                    if (j == 0) {
+                        fileName = "LV-SQZ.csv";
+                        plotValueVectors = plotValueVectorsSQZ;
+                    } else if (j == 1) {
+                        fileName = "LV-CRC.csv";
+                        plotValueVectors = plotValueVectorsCRC;
+                    } else {
+                        fileName = "LV-LNG.csv";
+                        plotValueVe
