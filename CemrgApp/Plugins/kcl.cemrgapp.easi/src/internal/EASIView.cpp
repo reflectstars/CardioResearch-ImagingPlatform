@@ -476,4 +476,77 @@ void EASIView::CreateMesh() {
                     mitk::ProgressBar::GetInstance()->AddStepsToDo(2);
                     std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
                     QString output = cmd->ExecuteCreateCGALMesh(directory, "CGALMesh", templatePath);
-         
+                    QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+                    mitk::ProgressBar::GetInstance()->Progress();
+
+                    //Prepare Visualisation
+                    mitk::BaseData::Pointer meshData = mitk::IOUtil::Load(output.toStdString()).at(0);
+                    mitk::UnstructuredGrid::Pointer mitkVtkGrid = dynamic_cast<mitk::UnstructuredGrid*>(meshData.GetPointer());
+                    vtkSmartPointer<vtkUnstructuredGrid> vtkGrid = mitkVtkGrid->GetVtkUnstructuredGrid();
+                    for (vtkIdType i = 0; i < vtkGrid->GetNumberOfPoints(); i++) {
+                        double* point = vtkGrid->GetPoint(i);
+                        point[0] += origin.GetElement(0);
+                        point[1] += origin.GetElement(1);
+                        point[2] += origin.GetElement(2);
+                        vtkGrid->GetPoints()->SetPoint(i, point);
+                    }//_for
+                    CemrgCommonUtils::AddToStorage(mitkVtkGrid, "CGALMesh", this->GetDataStorage());
+                    mitk::ProgressBar::GetInstance()->Progress();
+                    this->BusyCursorOff();
+
+                } else if (dialogCode == QDialog::Rejected) {
+                    inputs->close();
+                    inputs->deleteLater();
+                }//_if
+            } catch (mitk::Exception& e) {
+                //Deal with the situation not to have access
+                qDebug() << e.GetDescription();
+                return;
+            }//_try
+        } else
+            return;
+    } else
+        return;
+}
+
+void EASIView::ActivationSites() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_5_1->isVisible()) {
+        m_Controls.button_5_1->setVisible(false);
+    } else {
+        m_Controls.button_5_1->setVisible(true);
+        //Show the plugin
+        QMessageBox::information(
+            NULL, "Attention",
+            "Please select the activation site and then press Confirm Site button.");
+        this->GetSite()->GetPage()->ShowView("org.mitk.views.pointsetinteraction");
+    }
+}
+
+void EASIView::ConfrmSITE() {
+
+    //Check for selection of mesh
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please select a pointset from the Data Manager to confirm the activation site!");
+        return;
+    }//_if
+
+    bool ok;
+    mitk::DataNode::Pointer pstNode = nodes.at(0);
+    mitk::PointSet::Pointer pstObje = dynamic_cast<mitk::PointSet*>(pstNode->GetData());
+    if (pstObje && pstObje->GetSize() != 0) {
+
+        //Ask for the size
+        int scaleFactor = QInputDialog::getInt(NULL, tr("Activation Site"), tr("Enter the size:"), 5, 1, 10, 1, &ok);
+        if (!ok) {
+            QMessageBox::warning(NULL, "Attention", "Please enter a valid value for the size of activation site!");
+            return;
+        }
+
+        //Prepare activation sphere
+        mitk::DataNode::Pointer actiNode = mitk::DataNode::New();
+        mitk::Ellipsoid::Po
