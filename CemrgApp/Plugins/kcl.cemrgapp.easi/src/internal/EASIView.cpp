@@ -617,4 +617,84 @@ void EASIView::Simulation() {
                         plotValueVectors = plotValueVectorsCRC;
                     } else {
                         fileName = "LV-LNG.csv";
-                        plotValueVe
+                        plotValueVectors = plotValueVectorsLNG;
+                    }//_if
+                    ofstream fileLV;
+                    fileLV.open(directory.toStdString() + "/" + fileName.toStdString());
+                    std::vector<double> values;
+                    for (int s = 0; s < 16; s++) {
+                        for (int f = 0; f < 10; f++)
+                            values.push_back(plotValueVectors[f][s]);
+                        //Append the curve to the file
+                        for (size_t z = 0; z < values.size(); z++) {
+                            fileLV << values.at(z);
+                            if (z == values.size() - 1) fileLV << endl;
+                            else fileLV << ",";
+                        }
+                        values.clear();
+                    }//_for
+                    fileLV.close();
+                }//_csv
+
+            } else if (chamber == "LA") {
+
+                std::unique_ptr<CemrgStrains> strain2;
+                strain2 = std::unique_ptr<CemrgStrains>(new CemrgStrains(directory, 0));
+                std::vector<double> plotValueVectorsGlobalSQZ;
+
+                for (int j = 0; j < 10; j++)
+                    plotValueVectorsGlobalSQZ.push_back(strain2->CalculateGlobalSqzPlot(j));
+
+                QString fileName;
+                fileName = "LA-SQZ.csv";
+
+                ofstream fileLA;
+                fileLA.open(directory.toStdString() + "/" + fileName.toStdString());
+                std::vector<double> values;
+                for (int f = 0; f < 10; f++)
+                    values.push_back(plotValueVectorsGlobalSQZ[f]);
+                //Append the curve to the file
+                for (size_t z = 0; z < values.size(); z++) {
+                    fileLA << values.at(z);
+                    if (z == values.size() - 1) fileLA << endl;
+                    else fileLA << ",";
+                }
+                values.clear();
+                fileLA.close();
+
+            }//_chamber
+
+            qDebug() << QString::fromStdString(line) << "done!";
+        }//_while_direc
+        file.close();
+    }//_if
+}
+
+void EASIView::LoadMesh() {
+
+    QString path = "";
+    path = QFileDialog::getOpenFileName(
+        NULL, "Open Mesh Data File",
+        directory, QmitkIOUtil::GetFileOpenFilterString());
+    CemrgCommonUtils::AddToStorage(
+        CemrgCommonUtils::LoadVTKMesh(path.toStdString()), "Mesh", this->GetDataStorage());
+}
+
+void EASIView::Reset() {
+
+    try {
+
+        ctkPluginContext* context = mitk::kcl_cemrgapp_easi_Activator::getContext();
+        mitk::IDataStorageService* dss = 0;
+        ctkServiceReference dsRef = context->getServiceReference<mitk::IDataStorageService>();
+
+        if (dsRef)
+            dss = context->getService<mitk::IDataStorageService>(dsRef);
+
+        if (!dss) {
+            MITK_WARN << "IDataStorageService service not available. Unable to close project.";
+            context->ungetService(dsRef);
+            return;
+        }
+
+        mitk::IDataStorageReference::Pointer dataStorageRef = dss->GetActi
