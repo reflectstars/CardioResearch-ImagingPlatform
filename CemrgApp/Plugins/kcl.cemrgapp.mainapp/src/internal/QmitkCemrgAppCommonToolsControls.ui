@@ -68,4 +68,17 @@
      <property name="sizeType">
       <enum>QSizePolicy::Expanding</enum>
      </property>
-     <pr
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>220</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>
