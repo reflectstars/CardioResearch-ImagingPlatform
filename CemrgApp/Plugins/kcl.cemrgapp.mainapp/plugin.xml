@@ -18,4 +18,50 @@
   <extension point="org.blueberry.ui.views">
     <view id="org.mitk.views.cemrgappcommontools"
           name="CemrgApp Common Tools"
-          class="QmitkCemrgAppCommonTool
+          class="QmitkCemrgAppCommonTools"
+          icon="resources/icon.xpm" />
+  </extension>
+
+  <extension point="org.blueberry.ui.perspectives">
+    <perspective id="kcl.cemrgapp.CemrgJBPerspective"
+      name="Cemrg Motion Quantification"
+      class="QmitkCemrgJBPerspective"
+      icon="resources/icon_research.xpm" />
+  </extension>
+
+  <extension point="org.blueberry.ui.perspectives">
+    <perspective id="kcl.cemrgapp.CemrgRRPerspective"
+      name="Cemrg Anatomical Measurements"
+      class="QmitkCemrgRRPerspective"
+      icon="resources/icon_research.xpm" />
+  </extension>
+
+  <extension point="org.blueberry.ui.perspectives">
+    <perspective id="kcl.cemrgapp.CemrgHCPerspective"
+      name="Cemrg Scar Quantification"
+      class="QmitkCemrgHCPerspective"
+      icon="resources/icon_research.xpm" />
+  </extension>
+
+  <extension point="org.blueberry.ui.perspectives">
+    <perspective id="kcl.cemrgapp.CemrgEasiPerspective"
+      name="Cemrg Electrophysiology Simulations"
+      class="QmitkCemrgEasiPerspective"
+      icon="resources/icon_research.xpm" />
+  </extension>
+
+  <extension point="org.blueberry.ui.perspectives">
+    <perspective id="kcl.cemrgapp.CemrgPowertransPerspective"
+      name="Cemrg Power Transmitter"
+      class="QmitkCemrgPowertransPerspective"
+      icon="resources/icon_research.xpm" />
+  </extension>
+
+  <extension point="org.blueberry.ui.perspectives">
+    <perspective id="kcl.cemrgapp.CemrgWathcaPerspective"
+      name="Cemrg Morphological Measurements"
+      class="QmitkCemrgWathcaPerspective"
+      icon="resources/icon_research.xpm" />
+  </extension>
+
+</plugin>
