@@ -24,4 +24,28 @@
   *
   * This software is distributed WITHOUT ANY WARRANTY or SUPPORT!
   *
- ==
+ =========================================================================*/
+
+#ifndef QMITKCEMRGWORKBENCHADVISOR_H_
+#define QMITKCEMRGWORKBENCHADVISOR_H_
+#ifdef __MINGW32__
+// We need to inlclude winbase.h here in order to declare
+// atomic intrinsics like InterlockedIncrement correctly.
+// Otherwhise, they would be declared wrong within qatomic_windows.h .
+#include <windows.h>
+#endif
+
+#include <berryQtWorkbenchAdvisor.h>
+
+class QmitkCemrgWorkbenchAdvisor: public berry::QtWorkbenchAdvisor {
+
+public:
+
+    static const QString DEFAULT_PERSPECTIVE_ID;
+
+    void Initialize(berry::IWorkbenchConfigurer::Pointer configurer);
+    berry::WorkbenchWindowAdvisor* CreateWorkbenchWindowAdvisor(berry::IWorkbenchWindowConfigurer::Pointer configurer) override;
+    QString GetInitialWindowPerspectiveId() override;
+};
+
+#endif /*QMITKCEMRGWORKBENCHADVISOR_H_*/
