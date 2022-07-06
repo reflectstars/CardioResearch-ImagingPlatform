@@ -26,25 +26,23 @@
  *
 =========================================================================*/
 
-#include "QmitkCemrgJBPerspective.h"
-#include "berryIViewLayout.h"
+#ifndef QMITKCEMRGJBPERSPECTIVE_H_
+#define QMITKCEMRGJBPERSPECTIVE_H_
 
-QmitkCemrgJBPerspective::QmitkCemrgJBPerspective() {
-}
+#include <berryIPerspectiveFactory.h>
 
-QmitkCemrgJBPerspective::QmitkCemrgJBPerspective(const QmitkCemrgJBPerspective& other) : QObject() {
+class QmitkCemrgJBPerspective : public QObject, public berry::IPerspectiveFactory {
 
-    Q_UNUSED(other)
-    throw std::runtime_error("Copy constructor not implemented");
-}
+    Q_OBJECT
+    Q_INTERFACES(berry::IPerspectiveFactory)
 
-void QmitkCemrgJBPerspective::CreateInitialLayout(berry::IPageLayout::Pointer layout) {
+public:
 
-    QString editorArea = layout->GetEditorArea();
-    layout->AddView("org.mitk.views.mmcw", berry::IPageLayout::LEFT, 0.17f, editorArea);
-    berry::IFolderLayout::Pointer folder = layout->CreateFolder(
-                "folder", berry::IPageLayout::BOTTOM, 0.5f, "org.mitk.views.mmcw");
-    folder->AddView("org.mitk.views.datamanager");
-    berry::IViewLayout::Pointer lo = layout->GetViewLayout("org.mitk.views.mmcw");
-    lo->SetCloseable(false);
-}
+    QmitkCemrgJBPerspective();
+    QmitkCemrgJBPerspective(const QmitkCemrgJBPerspective& other);
+
+    void CreateInitialLayout(berry::IPageLayout::Pointer layout);
+
+};
+
+#endif /* QMITKCEMRGJBPERSPECTIVE_H_ */

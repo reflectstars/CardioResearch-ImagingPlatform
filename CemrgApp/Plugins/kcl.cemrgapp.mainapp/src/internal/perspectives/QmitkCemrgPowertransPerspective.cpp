@@ -1,3 +1,4 @@
+
 /*=========================================================================
 
  Program:   Medical Imaging & Interaction Toolkit
@@ -26,25 +27,25 @@
  *
 =========================================================================*/
 
-#include "QmitkCemrgJBPerspective.h"
+#include "QmitkCemrgPowertransPerspective.h"
 #include "berryIViewLayout.h"
 
-QmitkCemrgJBPerspective::QmitkCemrgJBPerspective() {
+QmitkCemrgPowertransPerspective::QmitkCemrgPowertransPerspective() {   
 }
 
-QmitkCemrgJBPerspective::QmitkCemrgJBPerspective(const QmitkCemrgJBPerspective& other) : QObject() {
+QmitkCemrgPowertransPerspective::QmitkCemrgPowertransPerspective(const QmitkCemrgPowertransPerspective& other) : QObject() {
 
     Q_UNUSED(other)
     throw std::runtime_error("Copy constructor not implemented");
 }
 
-void QmitkCemrgJBPerspective::CreateInitialLayout(berry::IPageLayout::Pointer layout) {
+void QmitkCemrgPowertransPerspective::CreateInitialLayout(berry::IPageLayout::Pointer layout) {
 
     QString editorArea = layout->GetEditorArea();
-    layout->AddView("org.mitk.views.mmcw", berry::IPageLayout::LEFT, 0.17f, editorArea);
+    layout->AddView("org.mitk.views.powertrans", berry::IPageLayout::LEFT, 0.17f, editorArea);
     berry::IFolderLayout::Pointer folder = layout->CreateFolder(
-                "folder", berry::IPageLayout::BOTTOM, 0.5f, "org.mitk.views.mmcw");
+                "folder", berry::IPageLayout::BOTTOM, 0.6f, "org.mitk.views.powertrans");
     folder->AddView("org.mitk.views.datamanager");
-    berry::IViewLayout::Pointer lo = layout->GetViewLayout("org.mitk.views.mmcw");
+    berry::IViewLayout::Pointer lo = layout->GetViewLayout("org.mitk.views.powertrans");
     lo->SetCloseable(false);
 }
