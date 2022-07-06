@@ -26,25 +26,23 @@
  *
 =========================================================================*/
 
-#include "QmitkCemrgRRPerspective.h"
-#include "berryIViewLayout.h"
+#ifndef QMITKCEMRGRRPERSPECTIVE_H_
+#define QMITKCEMRGRRPERSPECTIVE_H_
 
-QmitkCemrgRRPerspective::QmitkCemrgRRPerspective() {
-}
+#include <berryIPerspectiveFactory.h>
 
-QmitkCemrgRRPerspective::QmitkCemrgRRPerspective(const QmitkCemrgRRPerspective& other) : QObject() {
+class QmitkCemrgRRPerspective : public QObject, public berry::IPerspectiveFactory {
 
-    Q_UNUSED(other)
-    throw std::runtime_error("Copy constructor not implemented");
-}
+    Q_OBJECT
+    Q_INTERFACES(berry::IPerspectiveFactory)
 
-void QmitkCemrgRRPerspective::CreateInitialLayout(berry::IPageLayout::Pointer layout) {
+public:
 
-    QString editorArea = layout->GetEditorArea();
-    layout->AddView("org.mitk.views.motionmeasurement", berry::IPageLayout::LEFT, 0.35f, editorArea);
-    berry::IFolderLayout::Pointer folder = layout->CreateFolder(
-                "folder", berry::IPageLayout::BOTTOM, 0.8f, "org.mitk.views.motionmeasurement");
-    folder->AddView("org.mitk.views.datamanager");
-    berry::IViewLayout::Pointer lo = layout->GetViewLayout("org.mitk.views.motionmeasurement");
-    lo->SetCloseable(false);
-}
+    QmitkCemrgRRPerspective();
+    QmitkCemrgRRPerspective(const QmitkCemrgRRPerspective& other);
+
+    void CreateInitialLayout(berry::IPageLayout::Pointer layout);
+
+};
+
+#endif /* QMITKCEMRGRRPERSPECTIVE_H_ */

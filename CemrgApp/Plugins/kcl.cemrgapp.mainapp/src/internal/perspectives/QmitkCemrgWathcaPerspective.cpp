@@ -26,25 +26,16 @@
  *
 =========================================================================*/
 
-#include "QmitkCemrgRRPerspective.h"
+#include "QmitkCemrgWathcaPerspective.h"
 #include "berryIViewLayout.h"
 
-QmitkCemrgRRPerspective::QmitkCemrgRRPerspective() {
+QmitkCemrgWathcaPerspective::QmitkCemrgWathcaPerspective() {
 }
 
-QmitkCemrgRRPerspective::QmitkCemrgRRPerspective(const QmitkCemrgRRPerspective& other) : QObject() {
+QmitkCemrgWathcaPerspective::QmitkCemrgWathcaPerspective(const QmitkCemrgWathcaPerspective& other) : QObject() {
 
     Q_UNUSED(other)
     throw std::runtime_error("Copy constructor not implemented");
 }
 
-void QmitkCemrgRRPerspective::CreateInitialLayout(berry::IPageLayout::Pointer layout) {
-
-    QString editorArea = layout->GetEditorArea();
-    layout->AddView("org.mitk.views.motionmeasurement", berry::IPageLayout::LEFT, 0.35f, editorArea);
-    berry::IFolderLayout::Pointer folder = layout->CreateFolder(
-                "folder", berry::IPageLayout::BOTTOM, 0.8f, "org.mitk.views.motionmeasurement");
-    folder->AddView("org.mitk.views.datamanager");
-    berry::IViewLayout::Pointer lo = layout->GetViewLayout("org.mitk.views.motionmeasurement");
-    lo->SetCloseable(false);
-}
+void QmitkCemrgWathcaPerspective::CreateInitialLayout(berr
