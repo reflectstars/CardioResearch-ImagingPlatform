@@ -1,3 +1,4 @@
+
 /*=========================================================================
 
  Program:   Medical Imaging & Interaction Toolkit
@@ -26,25 +27,22 @@
  *
 =========================================================================*/
 
-#include "QmitkCemrgWathcaPerspective.h"
-#include "berryIViewLayout.h"
+#ifndef QMITKCEMRGWATHCAPERSPECTIVE_H_
+#define QMITKCEMRGWATHCAPERSPECTIVE_H_
 
-QmitkCemrgWathcaPerspective::QmitkCemrgWathcaPerspective() {
-}
+#include <berryIPerspectiveFactory.h>
 
-QmitkCemrgWathcaPerspective::QmitkCemrgWathcaPerspective(const QmitkCemrgWathcaPerspective& other) : QObject() {
+class QmitkCemrgWathcaPerspective : public QObject, public berry::IPerspectiveFactory {
 
-    Q_UNUSED(other)
-    throw std::runtime_error("Copy constructor not implemented");
-}
+    Q_OBJECT
+    Q_INTERFACES(berry::IPerspectiveFactory)
 
-void QmitkCemrgWathcaPerspective::CreateInitialLayout(berry::IPageLayout::Pointer layout) {
+public:
 
-    QString editorArea = layout->GetEditorArea();
-    layout->AddView("org.mitk.views.wathcaview", berry::IPageLayout::LEFT, 0.17f, editorArea);
-    berry::IFolderLayout::Pointer folder = layout->CreateFolder(
-                "folder", berry::IPageLayout::BOTTOM, 0.6f, "org.mitk.views.wathcaview");
-    folder->AddView("org.mitk.views.datamanager");
-    berry::IViewLayout::Pointer lo = layout->GetViewLayout("org.mitk.views.wathcaview");
-    lo->SetCloseable(false);
-}
+    QmitkCemrgWathcaPerspective();
+    QmitkCemrgWathcaPerspective(const QmitkCemrgWathcaPerspective& other);
+
+    void CreateInitialLayout(berry::IPageLayout::Pointer layout);
+};
+
+#endif /* QMITKCEMRGWATHCAPERSPECTIVE */
