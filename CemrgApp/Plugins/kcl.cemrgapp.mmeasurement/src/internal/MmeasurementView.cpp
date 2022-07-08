@@ -124,4 +124,67 @@ void MmeasurementView::ProcessIMGS() {
     if (m_Controls.button_2_1->isVisible()) {
         m_Controls.button_2_1->setVisible(false);
         m_Controls.button_2_2->setVisible(false);
-        m_Contro
+        m_Controls.button_2_3->setVisible(false);
+    } else {
+        m_Controls.button_2_1->setVisible(true);
+        m_Controls.button_2_2->setVisible(true);
+        m_Controls.button_2_3->setVisible(true);
+    }
+}
+
+void MmeasurementView::ConvertNII() {
+    //Check for temporal resolution
+    bool ok = true;
+    if (timePoints == 0)
+        timePoints = QInputDialog::getInt(NULL, tr("Time Points"), tr("Resolution:"), 10, 1, 100, 1, &ok);
+    if (!ok) {
+        QMessageBox::warning(NULL, "Attention", "Enter a correct value for the temporal resolution!");
+        timePoints = 0;
+        return;
+    }//_if
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != timePoints) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please load and select all images from the Data Manager before starting this step!");
+        return;
+    }//_if
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Order dicoms based on their cycle stages
+    std::vector<int> indexNodes;
+    std::string seriesDescription;
+    foreach (mitk::DataNode::Pointer node, nodes) {
+        node->GetData()->GetPropertyList()->GetStringProperty("dicom.series.SeriesDescription", seriesDescription);
+        if (seriesDescription.find("90.0%") != seriesDescription.npos) indexNodes.push_back(9);
+        else if (seriesDescription.find("80.0%") != seriesDescription.npos) indexNodes.push_back(8);
+        else if (seriesDescription.find("70.0%") != seriesDescription.npos) indexNodes.push_back(7);
+        else if (seriesDescription.find("60.0%") != seriesDescription.npos) indexNodes.push_back(6);
+        else if (seriesDescription.find("50.0%") != seriesDescription.npos) indexNodes.push_back(5);
+        else if (seriesDescription.find("40.0%") != seriesDescription.npos) indexNodes.push_back(4);
+        else if (seriesDescription.find("30.0%") != seriesDescription.npos) indexNodes.push_back(3);
+        else if (seriesDescription.find("20.0%") != seriesDescription.npos) indexNodes.push_back(2);
+        else if (seriesDescription.find("10.0%") != seriesDescription.npos) indexNodes.push_back(1);
+        else if (seriesDescription.find("0.0%") != seriesDescription.npos) indexNodes.push_back(0);
+    }//_for
+    //Sort indexes based on comparing values
+    std::vector<int> index(indexNodes.size());
+    std::iota(index.begin(), index.end(), 0);
+    std::sort(index.begin(), index.end(), [&](int i1, int i2) {return indexNodes[i1] < indexNodes[i2]; });
+
+    //Warning for cases when order is not found
+    size_t length1 = nodes.size();
+   
