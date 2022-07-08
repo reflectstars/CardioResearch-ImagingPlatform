@@ -26,26 +26,30 @@ PURPOSE.  See the above copyright notices for more information.
  *
 =========================================================================*/
 
-#include "kcl_cemrgapp_mmcwplugin_Activator.h"
-#include "MmcwView.h"
-#include "MmcwViewPlot.h"
+#ifndef kcl_cemrgapp_mmcwplugin_Activator_h
+#define kcl_cemrgapp_mmcwplugin_Activator_h
+
+#include <ctkPluginActivator.h>
 
 namespace mitk {
 
-    ctkPluginContext* kcl_cemrgapp_mmcwplugin_Activator::pluginContext = nullptr;
+    class kcl_cemrgapp_mmcwplugin_Activator: public QObject, public ctkPluginActivator {
 
-    void kcl_cemrgapp_mmcwplugin_Activator::start(ctkPluginContext *context) {
-        BERRY_REGISTER_EXTENSION_CLASS(MmcwView, context);
-        BERRY_REGISTER_EXTENSION_CLASS(MmcwViewPlot, context);
-        pluginContext = context;
-    }
+        Q_OBJECT
+        Q_PLUGIN_METADATA(IID "kcl_cemrgapp_mmcwplugin")
+        Q_INTERFACES(ctkPluginActivator)
 
-    void kcl_cemrgapp_mmcwplugin_Activator::stop(ctkPluginContext *context) {
-        Q_UNUSED(context)
-        pluginContext = nullptr;
-    }
+    public:
 
-    ctkPluginContext* kcl_cemrgapp_mmcwplugin_Activator::getContext() {
-        return pluginContext;
-    }
+        void start(ctkPluginContext *context);
+        void stop(ctkPluginContext *context);
+        static ctkPluginContext* getContext();
+
+    private:
+
+        static ctkPluginContext* pluginContext;
+
+    }; // kcl_cemrgapp_mmcwplugin_Activator
 }
+
+#endif // kcl_cemrgapp_mmcwplugin_Activator_h
