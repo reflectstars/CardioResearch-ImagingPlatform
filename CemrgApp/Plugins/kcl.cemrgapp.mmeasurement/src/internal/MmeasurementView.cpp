@@ -187,4 +187,83 @@ void MmeasurementView::ConvertNII() {
 
     //Warning for cases when order is not found
     size_t length1 = nodes.size();
-   
+    size_t length2 = indexNodes.size();
+    if (length1 != length2) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Cannot find the order of images automatically. Revert to user order and selections in the data manager!");
+        index.resize(nodes.size());
+        std::iota(index.begin(), index.end(), 0);
+    }//_if
+
+    //Convert to Nifti
+    int ctr = 0;
+    QString path;
+
+    this->BusyCursorOn();
+    mitk::ProgressBar::GetInstance()->AddStepsToDo(index.size());
+    foreach (int idx, index) {
+        path = directory + "/dcm-" + QString::number(ctr++) + ".nii";
+        bool successfulNitfi = CemrgCommonUtils::ConvertToNifti(nodes.at(idx)->GetData(), path);
+        if (successfulNitfi) {
+            this->GetDataStorage()->Remove(nodes.at(idx));
+        } else {
+            mitk::ProgressBar::GetInstance()->Progress(index.size());
+            return;
+        }
+        mitk::ProgressBar::GetInstance()->Progress();
+    }//for
+    nodes.clear();
+    this->BusyCursorOff();
+
+    //Load first item
+    ctr = 0;
+    path = directory + "/dcm-" + QString::number(ctr) + ".nii";
+    mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+    mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+}
+
+void MmeasurementView::CropinIMGS() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please select an image from the Data Manager to perform cropping!");
+        return;
+    }//_if
+
+    //Check to cut now or not
+    if (m_Controls.button_2_2->text() == QString::fromStdString("Are you done?")) {
+
+        QString path;
+        //Ask the user for a dir to locate data
+        if (directory.isEmpty()) {
+            directory = QFileDialog::getExistingDirectory(
+                NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+            if (directory.isEmpty() || directory.simplified().contains(" ")) {
+                QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+                directory = QString();
+                return;
+            }//_if
+        }
+
+        //Check for temporal resolution
+        bool ok = true;
+        if (timePoints == 0)
+            timePoints = QInputDialog::getInt(NULL, tr("Time Points"), tr("Resolution:"), 10, 1, 100, 1, &ok);
+        if (!ok) {
+            QMessageBox::warning(NULL, "Attention", "Enter a correct value for the temporal resolution!");
+            timePoints = 0;
+            return;
+        }//_if
+
+        //Cut selected image
+        this->BusyCursorOn();
+        mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+        mitk::Image::Pointer outputImage = CemrgCommonUtils::CropImage();
+        path = directory + "/" + CemrgCommonUtils::GetImageNode()->GetName().c_str() + ".nii";
+        mitk::IOUtil::Save(outputImage, path.toStdString());
+        mitk::ProgressB
