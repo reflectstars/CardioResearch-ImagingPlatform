@@ -266,4 +266,71 @@ void MmeasurementView::CropinIMGS() {
         mitk::Image::Pointer outputImage = CemrgCommonUtils::CropImage();
         path = directory + "/" + CemrgCommonUtils::GetImageNode()->GetName().c_str() + ".nii";
         mitk::IOUtil::Save(outputImage, path.toStdString());
-        mitk::ProgressB
+        mitk::ProgressBar::GetInstance()->Progress();
+        this->BusyCursorOff();
+
+        //Update datastorage
+        CemrgCommonUtils::AddToStorage(outputImage, CemrgCommonUtils::GetImageNode()->GetName(), this->GetDataStorage());
+        this->GetDataStorage()->Remove(CemrgCommonUtils::GetImageNode());
+        this->GetDataStorage()->Remove(CemrgCommonUtils::GetCuttingNode());
+        mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+        //Cut rest of images
+        int reply = QMessageBox::question(
+            NULL, "Question", "Would you like to automate cropping of other images in the cycle?",
+            QMessageBox::Yes, QMessageBox::No);
+        if (reply == QMessageBox::Yes) {
+
+            this->BusyCursorOn();
+            mitk::ProgressBar::GetInstance()->AddStepsToDo(timePoints - 1);
+
+            for (int i = 1; i < timePoints; i++) {
+
+                mitk::Image::Pointer inputImage;
+                path = directory + "/dcm-" + QString::number(i) + ".nii";
+                try {
+                    inputImage = dynamic_cast<mitk::Image*>(mitk::IOUtil::Load(path.toStdString()).front().GetPointer());
+                } catch (const std::exception&) {
+                    mitk::ProgressBar::GetInstance()->Progress();
+                    continue;
+                }//_try
+
+                //Setup cropper
+                CemrgCommonUtils::SetImageToCut(inputImage);
+                outputImage = CemrgCommonUtils::CropImage();
+                mitk::IOUtil::Save(outputImage, path.toStdString());
+                mitk::ProgressBar::GetInstance()->Progress();
+
+            }//_for
+            this->BusyCursorOff();
+        }//_if
+
+        m_Controls.button_2_2->setText("Crop Images");
+        return;
+    }//_if
+
+    //Prepare cutting cuboid
+    mitk::Cuboid::Pointer cuttingObject = mitk::Cuboid::New();
+    mitk::DataNode::Pointer cuttingNode = mitk::DataNode::New();
+    cuttingNode->SetData(cuttingObject);
+    cuttingNode->SetProperty("opacity", mitk::FloatProperty::New(0.4));
+    cuttingNode->SetProperty("color", mitk::ColorProperty::New(1.0, 1.0, 0.0));
+    cuttingNode->SetProperty("name", mitk::StringProperty::New("Cropper"));
+    this->GetDataStorage()->Add(cuttingNode);
+
+    //Mouse interactions
+    mitk::AffineImageCropperInteractor::Pointer affineDataInteractor = mitk::AffineImageCropperInteractor::New();
+    affineDataInteractor->LoadStateMachine("ClippingPlaneInteraction3D.xml", us::ModuleRegistry::GetModule("MitkDataTypesExt"));
+    affineDataInteractor->SetEventConfig("CropperDeformationConfig.xml", us::ModuleRegistry::GetModule("MitkDataTypesExt"));
+    affineDataInteractor->SetDataNode(cuttingNode);
+    cuttingNode->SetBoolProperty("pickable", true);
+
+    //Fit the cuboid to the image
+    mitk::Image::Pointer imageToCut;
+    mitk::BoundingObject::Pointer cuttingCube;
+    mitk::DataNode::Pointer imageNode = nodes.at(0);
+    mitk::BaseData::Pointer data = imageNode->GetData();
+    cuttingCube = dynamic_cast<mitk::BoundingObject*>(cuttingNode->GetData());
+    if (data) {
+        //Test if this data item is an image
+        imag
