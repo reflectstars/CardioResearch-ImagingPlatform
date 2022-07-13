@@ -406,4 +406,90 @@ void MmeasurementView::ResampIMGS() {
 
                 //Downsample rest of images
                 int reply = QMessageBox::question(
-                    NULL, "Question", "Would you like to automate downsampling of other images in the
+                    NULL, "Question", "Would you like to automate downsampling of other images in the cycle?",
+                    QMessageBox::Yes, QMessageBox::No);
+
+                if (reply == QMessageBox::Yes) {
+
+                    this->BusyCursorOn();
+                    mitk::ProgressBar::GetInstance()->AddStepsToDo(timePoints - 1);
+                    for (int i = 1; i < timePoints; i++) {
+
+                        mitk::Image::Pointer inputImage;
+                        path = directory + "/dcm-" + QString::number(i) + ".nii";
+                        try {
+                            inputImage = dynamic_cast<mitk::Image*>(mitk::IOUtil::Load(path.toStdString()).front().GetPointer());
+                        } catch (const std::exception&) {
+                            mitk::ProgressBar::GetInstance()->Progress();
+                            continue;
+                        }//_try
+
+                        //Setup sampler
+                        outputImage = CemrgCommonUtils::Downsample(inputImage, factor);
+                        mitk::IOUtil::Save(outputImage, path.toStdString());
+                        mitk::ProgressBar::GetInstance()->Progress();
+
+                    }//_for
+                    this->BusyCursorOff();
+                }//_if
+            }//_if
+        } else
+            return;
+    } else
+        return;
+}
+
+void MmeasurementView::TrackingButton() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_3_1->isVisible()) {
+        m_Controls.button_3_1->setVisible(false);
+        m_Controls.button_3_2->setVisible(false);
+    } else {
+        m_Controls.button_3_1->setVisible(true);
+        m_Controls.button_3_2->setVisible(true);
+    }
+}
+
+void MmeasurementView::SelectLandmark() {
+
+    //Show the plugin
+    QMessageBox::information(NULL, "Attention", "Please select your points in order!");
+    this->GetSite()->GetPage()->ShowView("org.mitk.views.pointsetinteraction");
+}
+
+void MmeasurementView::BrowseT(const QString& buttDir) {
+
+    QString time, para = "";
+    QString buttID = buttDir.left(1);
+    QString direct = buttDir.right(buttDir.size() - 1);
+
+    //Load target, time and parameter files
+    switch (buttID.toInt()) {
+    case 1:
+        time = QFileDialog::getOpenFileName(
+            NULL, "Open text file containing time points of source images",
+            direct, QmitkIOUtil::GetFileOpenFilterString());
+        m_UITracking.lineEdit_1->setText(time);
+        break;
+    case 2:
+        para = QFileDialog::getOpenFileName(
+            NULL, "Open text file containing parameters",
+            direct, QmitkIOUtil::GetFileOpenFilterString());
+        m_UITracking.lineEdit_2->setText(para);
+        break;
+    }//_switch
+}
+
+void MmeasurementView::BrowseA(const QString& buttDir) {
+
+    QString buttID = buttDir.left(1);
+    QString direct = buttDir.right(buttDir.size() - 1);
+
+    //Load input mesh, dofin file
+    switch (buttID.toInt()) {
+    case 1:
+        // QString input = QFileDialog::getOpenFileName(
+        //     NULL, "Open the input mesh",
+        //     direct, QmitkIOUtil::GetFileOpenFilterString());
+        //m_UIApplying.lineEdit_1->setText(
