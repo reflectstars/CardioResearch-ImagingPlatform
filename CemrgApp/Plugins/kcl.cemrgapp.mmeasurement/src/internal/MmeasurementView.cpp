@@ -568,4 +568,82 @@ void MmeasurementView::Tracking() {
         this->BusyCursorOn();
         std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
         cmd->ExecuteTracking(directory, time, para);
-        QMessageBox::information(NULL, "Attention"
+        QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+        this->BusyCursorOff();
+        signalMapper->deleteLater();
+        inputs->deleteLater();
+
+    } else if (dialogCode == QDialog::Rejected) {
+        inputs->close();
+        signalMapper->deleteLater();
+        inputs->deleteLater();
+    }//_if
+}
+
+void MmeasurementView::Applying() {
+
+    //Find selected points
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please select points from the Data Manager before starting this step!");
+        return;
+    }
+
+    //Ask the user for project directory
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory to Save Transformations", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Check for temporal resolution
+    bool ok = true;
+    if (timePoints == 0)
+        timePoints = QInputDialog::getInt(NULL, tr("Time Points"), tr("Resolution:"), 10, 1, 100, 1, &ok);
+    if (!ok) {
+        QMessageBox::warning(NULL, "Attention", "Enter a correct value for the temporal resolution!");
+        timePoints = 0;
+        return;
+    }//_if
+
+    //Conversion
+    mitk::DataNode::Pointer node = nodes.front();
+    mitk::BaseData::Pointer data = node->GetData();
+    if (data) {
+
+        //Test if this data item is a pointSet
+        mitk::PointSet::Pointer pst = dynamic_cast<mitk::PointSet*>(data.GetPointer());
+        if (pst) {
+
+            std::unique_ptr<CemrgMeasure> rr(new CemrgMeasure());
+            rr->Convert(directory, node);
+
+            //Ask for user input to set the parameters
+            QDialog* inputs = new QDialog(0, 0);
+            QSignalMapper* signalMapper = new QSignalMapper(this);
+
+            m_UIApplying.setupUi(inputs);
+            connect(m_UIApplying.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+            connect(m_UIApplying.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+            connect(m_UIApplying.pushButton_2, SIGNAL(clicked()), signalMapper, SLOT(map()));
+            signalMapper->setMapping(m_UIApplying.pushButton_2, "2" + directory);
+            connect(signalMapper, SIGNAL(mapped(QString)), this, SLOT(BrowseA(const QString&)));
+            m_UIApplying.lineEdit_4->setPlaceholderText("Enter Number of Frames (default = " + QString::number(timePoints) + ")");
+
+            int dialogCode = inputs->exec();
+
+            //Act on dialog return code
+            if (dialogCode == QDialog::Accepted) {
+
+                //Load input mesh, dofin file
+                QString input = directory + "/input.vtk";
+                QString dofin = m_UIApplying.lineEdit_3->text();
+
+                //Load initial time, number of f
