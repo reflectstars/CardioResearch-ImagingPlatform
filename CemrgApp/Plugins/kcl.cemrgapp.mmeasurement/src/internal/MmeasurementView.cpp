@@ -492,4 +492,80 @@ void MmeasurementView::BrowseA(const QString& buttDir) {
         // QString input = QFileDialog::getOpenFileName(
         //     NULL, "Open the input mesh",
         //     direct, QmitkIOUtil::GetFileOpenFilterString());
-        //m_UIApplying.lineEdit_1->setText(
+        //m_UIApplying.lineEdit_1->setText(input);
+        break;
+    case 2:
+        QString dofin = QFileDialog::getOpenFileName(
+            NULL, "Open the transformation file",
+            direct, QmitkIOUtil::GetFileOpenFilterString());
+        m_UIApplying.lineEdit_3->setText(dofin);
+        break;
+    }//_switch
+}
+
+void MmeasurementView::Tracking() {
+
+    //Ask the user for project directory
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory to Locate Images", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Check for temporal resolution
+    bool ok = true;
+    if (timePoints == 0)
+        timePoints = QInputDialog::getInt(NULL, tr("Time Points"), tr("Resolution:"), 10, 1, 100, 1, &ok);
+    if (!ok) {
+        QMessageBox::warning(NULL, "Attention", "Enter a correct value for the temporal resolution!");
+        timePoints = 0;
+        return;
+    }//_if
+
+    //Ask for user input to set the parameters
+    QDialog* inputs = new QDialog(0, 0);
+    QSignalMapper* signalMapper = new QSignalMapper(this);
+
+    m_UITracking.setupUi(inputs);
+    connect(m_UITracking.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+    connect(m_UITracking.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+    connect(m_UITracking.pushButton_1, SIGNAL(clicked()), signalMapper, SLOT(map()));
+    connect(m_UITracking.pushButton_2, SIGNAL(clicked()), signalMapper, SLOT(map()));
+    signalMapper->setMapping(m_UITracking.pushButton_1, "1" + directory);
+    signalMapper->setMapping(m_UITracking.pushButton_2, "2" + directory);
+    connect(signalMapper, SIGNAL(mapped(QString)), this, SLOT(BrowseT(const QString&)));
+
+    int dialogCode = inputs->exec();
+
+    //Act on dialog return code
+    if (dialogCode == QDialog::Accepted) {
+
+        QString time = m_UITracking.lineEdit_1->text();
+        QString para = m_UITracking.lineEdit_2->text();
+
+        //Checking input files
+        if (time.isEmpty() || para.isEmpty())
+            QMessageBox::warning(NULL, "Attention", "Reverting to default time or parameter file!");
+
+        if (time.isEmpty()) {
+            ofstream file;
+            //Absolute path
+            QString aPath = QCoreApplication::applicationDirPath() + "/MLib";
+            file.open(aPath.toStdString() + "/imgTimes.lst");
+            file << directory << "/dcm- .nii" << endl;
+            for (int i = 0; i < timePoints; i++)
+                file << i << " " << i * 10 << endl;
+            file.close();
+            time = aPath + "/imgTimes.lst";
+        }//_if
+
+        //Commandline execution
+        this->BusyCursorOn();
+        std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+        cmd->ExecuteTracking(directory, time, para);
+        QMessageBox::information(NULL, "Attention"
