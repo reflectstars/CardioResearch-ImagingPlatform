@@ -646,4 +646,72 @@ void MmeasurementView::Applying() {
                 QString input = directory + "/input.vtk";
                 QString dofin = m_UIApplying.lineEdit_3->text();
 
-                //Load initial time, number of f
+                //Load initial time, number of frames, smoothness
+                bool ok1, ok2;
+                double iniTime = m_UIApplying.lineEdit_2->text().toDouble(&ok1);
+                int frames = m_UIApplying.lineEdit_4->text().toInt(&ok2);
+                if (m_UIApplying.radioButton_1->isChecked()) smoothness = 1;
+                else if (m_UIApplying.radioButton_2->isChecked()) smoothness = 2;
+                else if (m_UIApplying.radioButton_3->isChecked()) smoothness = 3;
+
+                //Checking input values
+                if (input.isEmpty() || dofin.isEmpty()) {
+                    QMessageBox::warning(NULL, "Attention", "Please select the input files to apply tracking!");
+                    signalMapper->deleteLater();
+                    inputs->deleteLater();
+                    return;
+                }
+                if (!ok1 || !ok2)
+                    QMessageBox::warning(NULL, "Attention", "Reverting to default parameters!");
+                if (!ok1) iniTime = 0;
+                if (!ok2) frames = timePoints;
+                //_if
+
+                //Commandline execution
+                this->BusyCursorOn();
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(frames * smoothness);
+                std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+                cmd->ExecuteApplying(directory, input, iniTime, dofin, frames, smoothness);
+                QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+                this->BusyCursorOff();
+                signalMapper->deleteLater();
+                inputs->deleteLater();
+
+            } else if (dialogCode == QDialog::Rejected) {
+                inputs->close();
+                signalMapper->deleteLater();
+                inputs->deleteLater();
+            }//_if
+
+        } else {
+            QMessageBox::warning(
+                NULL, "Attention", "Please select points from the Data Manager before starting this step!");
+        }//_pst
+    }//_data
+}
+
+void MmeasurementView::WriteFileButton() {
+
+    //Ask the user for project directory
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory to Save Plot", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    if (plotValueVectors.size() != 0) {
+
+        bool ok;
+        QString fileName = "Plot.csv";
+        fileName = QInputDialog::getText(NULL, tr("Save As"), tr("File Name:"), QLineEdit::Normal, fileName, &ok);
+        if (ok && !fileName.isEmpty() && fileName.endsWith(".csv")) {
+
+            ofstream file;
+            file.open(directory.toStdString() + "/" + fileName.toStdString());
+            std::vector<double> values;
+            for (int i = 0; i < timePo
