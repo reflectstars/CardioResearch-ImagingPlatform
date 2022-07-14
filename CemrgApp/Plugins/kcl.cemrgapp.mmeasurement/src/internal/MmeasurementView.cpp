@@ -714,4 +714,76 @@ void MmeasurementView::WriteFileButton() {
             ofstream file;
             file.open(directory.toStdString() + "/" + fileName.toStdString());
             std::vector<double> values;
-            for (int i = 0; i < timePo
+            for (int i = 0; i < timePoints * smoothness; i++)
+                values.push_back(plotValueVectors[i]);
+            //Append the curve to the file
+            for (size_t z = 0; z < values.size(); z++) {
+                file << values.at(z);
+                if (z == values.size() - 1) file << endl;
+                else file << ",";
+            }
+            values.clear();
+            file.close();
+
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please type a file name with the right extension (i.e. .csv)!");
+            return;
+        }//_fileName
+    }//_if
+}
+
+void MmeasurementView::CalcDistButton() {
+
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(NULL, "Attention",
+        "Have you applied tracking on your points?", QMessageBox::Yes | QMessageBox::No);
+    if (reply == QMessageBox::No || smoothness == 0)
+        return;
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    plotValueVectors.clear();
+    QmitkPlotWidget::DataVector xValues;
+    QmitkPlotWidget::DataVector yValues;
+    //Remove previous points
+    mitk::DataStorage::SetOfObjects::ConstPointer nodesToRemove = this->GetDataStorage()->GetAll();
+    mitk::DataStorage::SetOfObjects::ConstIterator iter = nodesToRemove->Begin();
+    mitk::DataStorage::SetOfObjects::ConstIterator iterEnd = nodesToRemove->End();
+    for (; iter != iterEnd; ++iter) {
+        QString name = QString::fromStdString(iter->Value()->GetName());
+        bool ok; name.toInt(&ok);
+        if (ok) this->GetDataStorage()->Remove(iter->Value());
+    }//_for
+
+    std::unique_ptr<CemrgMeasure> rr(new CemrgMeasure());
+    CemrgMeasure::Points points;
+
+    for (int frame = 0; frame < timePoints * smoothness; frame++) {
+        points = rr->Deconvert(directory, frame);
+        if (points.size() == 0) {
+            QMessageBox::warning(NULL, "Attention", "You have not applied tracking on your points!");
+            return;
+        }//_if
+        xValues.push_back(frame);
+        yValues.push_back(rr->CalcDistance(points));
+        plotValueVectors.push_back(rr->CalcDistance(points));
+        //Tracked points visualisation
+        mitk::PointSet::Pointer set = mitk::PointSet::New();
+        for (unsigned int i = 0; i < points.size(); i++) {
+            mitk::Point3D p;
+            p.SetElement(0, std::get<0>(points.at(i)));
+            p.SetElement(1, std::get<1>(points.at(i)));
+            p.SetElement(2, std::get<2>(points.at(i)));
+            set->InsertPoint(i, p);
+        }
+        CemrgCommonUtils::AddToStorage(set, std::to_string(f
