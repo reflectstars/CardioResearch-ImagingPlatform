@@ -927,4 +927,82 @@ void MmeasurementView::CalcAreaButton() {
 
     m_Controls.widget_2->Clear();
     int curveId = m_Controls.widget_2->InsertCurve("Area");
-    m_Controls.widget_2->SetPlotTitle("Measure
+    m_Controls.widget_2->SetPlotTitle("Measurement Plot");
+    m_Controls.widget_2->SetAxisTitle(QwtPlot::xBottom, "Time Frames");
+    m_Controls.widget_2->SetAxisTitle(QwtPlot::yLeft, "Value");
+    m_Controls.widget_2->SetCurveData(curveId, xValues, yValues);
+    m_Controls.widget_2->SetCurvePen(curveId, QPen("red"));
+    m_Controls.widget_2->SetCurveTitle(curveId, "Area");
+    m_Controls.widget_2->Replot();
+}
+
+void MmeasurementView::FindCentre() {
+
+    //Find selected points
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+            NULL, "Attention",
+            "Please select points from the Data Manager before starting this step!");
+        return;
+    }
+
+    //Conversion
+    mitk::DataNode::Pointer node = nodes.front();
+    mitk::BaseData::Pointer data = node->GetData();
+    if (data) {
+
+        //Test if this data item is a pointSet
+        mitk::PointSet::Pointer pst = dynamic_cast<mitk::PointSet*>(data.GetPointer());
+        if (pst) {
+
+            //Find centre
+            std::unique_ptr<CemrgMeasure> rr(new CemrgMeasure());
+            mitk::Point3D centre = rr->FindCentre(pst);
+            mitk::PointSet::Pointer pstCtr = mitk::PointSet::New();
+            pstCtr->SetPoint(0, centre);
+
+            //Remove previous centre points
+            mitk::DataStorage::SetOfObjects::ConstPointer nodesToRemove = this->GetDataStorage()->GetAll();
+            mitk::DataStorage::SetOfObjects::ConstIterator iter = nodesToRemove->Begin();
+            mitk::DataStorage::SetOfObjects::ConstIterator iterEnd = nodesToRemove->End();
+            for (; iter != iterEnd; ++iter) {
+                QString name = QString::fromStdString(iter->Value()->GetName());
+                if (name.compare("Centre Point") == 0)
+                    this->GetDataStorage()->Remove(iter->Value());
+            }//_for
+
+            //Add to storage
+            mitk::DataNode::Pointer pointSetNode = mitk::DataNode::New();
+            pointSetNode->SetData(pstCtr);
+            pointSetNode->SetProperty("name", mitk::StringProperty::New("Centre Point"));
+            pointSetNode->SetProperty("opacity", mitk::FloatProperty::New(1));
+            pointSetNode->SetColor(0.0, 0.74902, 1.0);
+            this->GetDataStorage()->Add(pointSetNode);
+
+        } else {
+            QMessageBox::warning(
+                NULL, "Attention", "Please select points from the Data Manager before starting this step!");
+        }//_pst
+    }//_data
+}
+
+void MmeasurementView::Reset() {
+
+    try {
+
+        ctkPluginContext* context = mitk::kcl_cemrgapp_mmeasurement_Activator::getContext();
+        mitk::IDataStorageService* dss = 0;
+        ctkServiceReference dsRef = context->getServiceReference<mitk::IDataStorageService>();
+
+        if (dsRef)
+            dss = context->getService<mitk::IDataStorageService>(dsRef);
+
+        if (!dss) {
+            MITK_WARN << "IDataStorageService service not available. Unable to close project.";
+            context->ungetService(dsRef);
+            return;
+        }
+
+        mitk::IDataStorageReference::Pointer dataStorageRef = dss->GetActiveDataStorage();
+        if (dataStorageRef.I
