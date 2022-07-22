@@ -1,3 +1,4 @@
+
 /*=========================================================================
 
 Program:   Medical Imaging & Interaction Toolkit
@@ -26,24 +27,30 @@ PURPOSE.  See the above copyright notices for more information.
  *
 =========================================================================*/
 
-#include "kcl_cemrgapp_mmeasurement_Activator.h"
-#include "MmeasurementView.h"
+#ifndef kcl_cemrgapp_mmeasurement_Activator_h
+#define kcl_cemrgapp_mmeasurement_Activator_h
+
+#include <ctkPluginActivator.h>
 
 namespace mitk {
 
-    ctkPluginContext* kcl_cemrgapp_mmeasurement_Activator::pluginContext = nullptr;
+    class kcl_cemrgapp_mmeasurement_Activator: public QObject, public ctkPluginActivator {
 
-    void kcl_cemrgapp_mmeasurement_Activator::start(ctkPluginContext *context) {
-        BERRY_REGISTER_EXTENSION_CLASS(MmeasurementView, context);
-        pluginContext = context;
-    }
+        Q_OBJECT
+        Q_PLUGIN_METADATA(IID "kcl_cemrgapp_mmeasurement")
+        Q_INTERFACES(ctkPluginActivator)
 
-    void kcl_cemrgapp_mmeasurement_Activator::stop(ctkPluginContext *context) {
-        Q_UNUSED(context)
-        pluginContext = nullptr;
-    }
+    public:
 
-    ctkPluginContext* kcl_cemrgapp_mmeasurement_Activator::getContext() {
-        return pluginContext;
-    }
+        void start(ctkPluginContext *context);
+        void stop(ctkPluginContext *context);
+        static ctkPluginContext* getContext();
+
+    private:
+
+        static ctkPluginContext* pluginContext;
+
+    }; // kcl_cemrgapp_mmeasurement_Activator
 }
+
+#endif // kcl_cemrgapp_mmeasurement_Activator_h
