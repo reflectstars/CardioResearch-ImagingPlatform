@@ -656,3 +656,278 @@ void powertransView::CalculatePower() {
     //Ask the user for a dir to store data
     if (directory.isEmpty()) {
         directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+    //Ask for user input to set the ribSpacing number
+    if (ribSpacing == 0) {
+        QDialog* inputs = new QDialog(0, 0);
+        m_UIRibSpacing.setupUi(inputs);
+
+        connect(m_UIRibSpacing.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+        connect(m_UIRibSpacing.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+
+        int dialogCode = inputs->exec();
+        //Act on dialog return code
+        if (dialogCode == QDialog::Accepted) {
+
+            QString ribSpacingStr = m_UIRibSpacing.lineEdit_1->text();
+
+            //Checking input rib spacing
+            if (ribSpacingStr.isEmpty()) {
+                ribSpacing = 5;
+                QMessageBox::warning(NULL, "Attention", "Default: Rib spacing 5 is used");
+
+            } else {
+                bool flag;
+                ribSpacing = ribSpacingStr.toInt(&flag);
+                if (!flag) {
+                    QMessageBox::warning(NULL, "Attention", "Wrong input for rib spacing. Using default rib spacing = 5");
+                    ribSpacing = 5;
+                }
+            }
+            inputs->deleteLater();
+        } else if (dialogCode == QDialog::Rejected) {
+            inputs->close();
+            inputs->deleteLater();
+            return;
+        }
+    }
+
+    //Check for selection of endo mesh
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(NULL, "Attention", "Please select input mesh from the Data Manager to calculate power!");
+        return;
+    }
+    mitk::DataNode::Pointer endoNode = nodes.at(0);
+    mitk::BaseData::Pointer data = endoNode->GetData();
+    if (data) {
+        mitk::Surface::Pointer surface = dynamic_cast<mitk::Surface*>(data.GetPointer());
+        if (surface) {
+
+            QString outstr = "Calculated power on selected mesh for Rib spacing" + QString::number(ribSpacing);
+            QMessageBox::information(NULL, "Attention", outstr);
+
+            this->BusyCursorOn();
+            mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+            power = std::unique_ptr<CemrgPower>(new CemrgPower(directory, ribSpacing));
+            // mitk::Surface::Pointer outputEndoMesh = power->CalculateAcousticIntensity(surface);
+            // Load in mesh
+            //AddToStorage("PowerMap", outputEndoMesh);
+            mitk::ProgressBar::GetInstance()->Progress();
+            this->BusyCursorOff();
+
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please select input mesh from the Data Manager to calculate power!");
+            return;
+        }//_if
+
+    } else {
+        QMessageBox::warning(NULL, "Attention", "Can't pick up node from data manager");
+        return;
+    }//_if
+}
+
+void powertransView::MapAHATop() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_6_1->isVisible()) {
+        m_Controls.button_6_1->setVisible(false);
+        m_Controls.button_6_2->setVisible(false);
+        m_Controls.button_6_3->setVisible(false);
+
+    } else {
+        m_Controls.button_6_1->setVisible(true);
+        m_Controls.button_6_2->setVisible(true);
+        m_Controls.button_6_3->setVisible(true);
+
+    }
+}
+void powertransView::AHALandmarkSelection() {
+
+    QMessageBox::information(
+        NULL, "Attention",
+        "Please select 6 points in order:\n\n1 on the Apex\n3 on the Mitral Valve surface\n2 on the Right Ventricle cusps\n");
+
+    this->GetSite()->GetPage()->ShowView("org.mitk.views.pointsetinteraction");
+
+}
+void powertransView::MapAHAfromInput() {
+
+    //Ask for user input to set the parameters
+    QDialog* inputs = new QDialog(0, 0);
+    QSignalMapper* signalMapper = new QSignalMapper(this);
+
+    m_UIAhaInput.setupUi(inputs);
+    connect(m_UIAhaInput.pushButton_1, SIGNAL(clicked()), signalMapper, SLOT(map()));
+    connect(m_UIAhaInput.pushButton_2, SIGNAL(clicked()), signalMapper, SLOT(map()));
+    signalMapper->setMapping(m_UIAhaInput.pushButton_1, "1" + directory + "/ebr" + QString::number(ribSpacing) + ".vtk");
+    signalMapper->setMapping(m_UIAhaInput.pushButton_2, "2" + directory);
+    connect(signalMapper, SIGNAL(mapped(QString)), this, SLOT(BrowseA(const QString&)));
+
+    int dialogCode = inputs->exec();
+
+    //Act on dialog return code
+    if (dialogCode == QDialog::Accepted) {
+
+        //Load input mesh, dofin file
+        QString endomesh = m_UIAhaInput.lineEdit_1->text();
+        QString AHAlm = m_UIAhaInput.lineEdit_2->text();
+
+        mitk::Surface::Pointer surface = mitk::IOUtil::Load<mitk::Surface>(endomesh.toStdString());
+        mitk::PointSet::Pointer pointset = mitk::IOUtil::Load<mitk::PointSet>(AHAlm.toStdString());
+
+        //Checking input values
+        if (endomesh.isEmpty() || AHAlm.isEmpty()) {
+            QMessageBox::warning(NULL, "Attention", "Please select the input files to apply AHA mapping!");
+            signalMapper->deleteLater();
+            inputs->deleteLater();
+            return;
+        }
+
+        this->BusyCursorOn();
+        mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+        power = std::unique_ptr<CemrgPower>(new CemrgPower(directory, ribSpacing));
+        mitk::Surface::Pointer outputAHAMesh = power->ReferenceAHA(pointset, surface);
+        CemrgCommonUtils::AddToStorage(outputAHAMesh, "PowerMap", this->GetDataStorage());
+        mitk::ProgressBar::GetInstance()->Progress();
+        this->BusyCursorOff();
+
+    } else if (dialogCode == QDialog::Rejected) {
+
+        inputs->close();
+        signalMapper->deleteLater();
+        inputs->deleteLater();
+        return;
+
+    }//_if
+}
+
+void powertransView::MapAHA() {
+
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    //Sort the two images
+
+    if (nodes.size() != 2) {
+        QMessageBox::warning(NULL, "Attention", "1) Please select  pointset and mesh for AHA mapping");
+        return;
+    }
+
+    mitk::DataNode::Pointer _1st = nodes.at(0);
+    mitk::DataNode::Pointer _2nd = nodes.at(1);
+    mitk::BaseData::Pointer dat1 = _1st->GetData();
+    mitk::BaseData::Pointer dat2 = _2nd->GetData();
+
+    // to get the name of the file in the Data manager.
+    QString name = QString::fromStdString(_2nd->GetName());
+    // create path
+    QString path2surface = directory + "/" + name;
+    // load surface
+    mitk::Surface::Pointer surface = mitk::IOUtil::Load<mitk::Surface>(path2surface.toStdString());
+
+    if (dat1 && dat2) {
+        //Test if this data items are image
+        mitk::PointSet::Pointer pointset = dynamic_cast<mitk::PointSet*>(dat1.GetPointer());
+        //mitk::Surface::Pointer surface = dynamic_cast<mitk::Surface*>(dat2.GetPointer());
+        //if (pointset && surface) {
+
+        if (!pointset) {
+            QMessageBox::warning(NULL, "Attention", "Cannot dynamic cast pointset");
+        }
+        //mitk::Surface::Pointer surface = dynamic_cast<mitk::Surface*>(nodes.at(1)->GetData());
+
+        if (!surface) {
+            QMessageBox::warning(NULL, "Attention", "Cannot dynamic cast surface");
+        }
+
+        //
+        if (!pointset || !surface) {
+            surface = dynamic_cast<mitk::Surface*>(nodes.at(0)->GetData());
+            pointset = dynamic_cast<mitk::PointSet*>(nodes.at(1)->GetData());
+            if (!pointset || !surface) {
+                QMessageBox::warning(NULL, "Attention", "Cannot dynamic cast pointset and mesh for AHA mapping");
+                return;
+            }
+        }
+
+        this->BusyCursorOn();
+        mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+        power = std::unique_ptr<CemrgPower>(new CemrgPower(directory, ribSpacing));
+        mitk::Surface::Pointer outputAHAMesh = power->ReferenceAHA(pointset, surface);
+        CemrgCommonUtils::AddToStorage(outputAHAMesh, "PowerMap", this->GetDataStorage());
+        mitk::ProgressBar::GetInstance()->Progress();
+        this->BusyCursorOff();
+
+    } else {
+        QMessageBox::warning(NULL, "Attention", "2) Please select pointset and mesh for AHA mapping");
+        return;
+    }//_if
+}
+
+void powertransView::Reset() {
+
+    try {
+
+        ctkPluginContext* context = mitk::kcl_cemrgapp_powertrans_Activator::getContext();
+        mitk::IDataStorageService* dss = 0;
+        ctkServiceReference dsRef = context->getServiceReference<mitk::IDataStorageService>();
+
+        if (dsRef)
+            dss = context->getService<mitk::IDataStorageService>(dsRef);
+
+        if (!dss) {
+            MITK_WARN << "IDataStorageService service not available. Unable to close project.";
+            context->ungetService(dsRef);
+            return;
+        }
+
+        mitk::IDataStorageReference::Pointer dataStorageRef = dss->GetActiveDataStorage();
+        if (dataStorageRef.IsNull()) {
+            //No active data storage set (i.e. not editor with a DataStorageEditorInput is active).
+            dataStorageRef = dss->GetDefaultDataStorage();
+        }
+
+        mitk::DataStorage::Pointer dataStorage = dataStorageRef->GetDataStorage();
+        if (dataStorage.IsNull()) {
+            MITK_WARN << "No data storage available. Cannot close project.";
+            return;
+        }
+
+        //Check if we got the default datastorage and if there is anything else then helper object in the storage
+        if (dataStorageRef->IsDefault() && dataStorage->GetSubset(
+            mitk::NodePredicateNot::New(
+                mitk::NodePredicateProperty::New("helper object", mitk::BoolProperty::New(true))))->empty())
+            return;
+
+        //Remove everything
+        mitk::DataStorage::SetOfObjects::ConstPointer nodesToRemove = dataStorage->GetAll();
+        dataStorage->Remove(nodesToRemove);
+
+        //Remove the datastorage from the data storage service
+        dss->RemoveDataStorageReference(dataStorageRef);
+
+        //Close all editors with this data storage as input
+        mitk::DataStorageEditorInput::Pointer dsInput(new mitk::DataStorageEditorInput(dataStorageRef));
+        QList<berry::IEditorReference::Pointer> dsEditors =
+            this->GetSite()->GetPage()->FindEditors(dsInput, QString(), berry::IWorkbenchPage::MATCH_INPUT);
+
+        if (!dsEditors.empty()) {
+            QList<berry::IEditorReference::Pointer> editorsToClose = dsEditors;
+            this->GetSite()->GetPage()->CloseEditors(editorsToClose, false);
+        }
+
+    } catch (std::exception& e) {
+
+        MITK_ERROR << "Exception caught during closing project: " << e.what();
+        QMessageBox::warning(NULL, "Error", QString("An error occurred during Close Project: %1").arg(e.what()));
+    }//_try
+
+    //Clear project directory
+    directory.clear();
+}
