@@ -187,4 +187,78 @@ void AtrialScarView::LoadDICOM() {
                     if (thisFile.contains(".nii", Qt::CaseSensitive)) {
                         if (thisFile.contains("lge", Qt::CaseInsensitive) || thisFile.contains("mra", Qt::CaseInsensitive)) {
 
-                            path = niftiFolder.absolutePath() + "/" + thisFile
+                            path = niftiFolder.absolutePath() + "/" + thisFile;
+                            mitk::Image::Pointer image = mitk::IOUtil::Load<mitk::Image>(path.toStdString());
+                            std::string key = "dicom.series.SeriesDescription";
+                            mitk::DataStorage::SetOfObjects::Pointer set = mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+                            set->Begin().Value()->GetData()->GetPropertyList()->SetStringProperty(key.c_str(), thisFile.left(thisFile.length() - 4).toStdString().c_str());
+
+                        }//_if
+                    }//_if
+                }//_for
+
+            } else {
+
+                MITK_WARN << "Problem with conversion.";
+                QMessageBox::warning(NULL, "Attention", "Problem with alternative conversion. Try MITK Dicom editor?");
+                return;
+
+            }//_if
+        }//_if
+
+    } else {
+
+        MITK_INFO << "Using MITK DICOM editor";
+        QString editor_id = "org.mitk.editors.dicomeditor";
+        berry::IEditorInput::Pointer input(new berry::FileEditorInput(QString()));
+        this->GetSite()->GetPage()->OpenEditor(input, editor_id);
+
+    }//_if
+}
+
+void AtrialScarView::ProcessIMGS() {
+    //Toggle visibility of buttons
+    if (m_Controls.button_2_1->isVisible()) {
+        m_Controls.button_2_1->setVisible(false);
+    } else {
+        m_Controls.button_2_1->setVisible(true);
+    }
+}
+
+void AtrialScarView::ConvertNII() {
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 2) {
+        QMessageBox::warning(NULL, "Attention", "Please load and select both LGE and CEMRA images from the Data Manager to convert!");
+        return;
+    }//_if
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Order dicoms based on their type
+    std::vector<int> indexNodes;
+    std::vector<std::string> seriesDscrps;
+    foreach (mitk::DataNode::Pointer node, nodes) {
+
+        std::string seriesDescription;
+        node->GetData()->GetPropertyList()->GetStringProperty("dicom.series.SeriesDescription", seriesDescription);
+
+        if (seriesDescription.find("LGE") != seriesDescription.npos) indexNodes.push_back(0);
+        else if (seriesDescription.find("MRA") != seriesDescription.npos) indexNodes.push_back(1);
+
+        //Trim whitespaces
+        seriesDescription = QString::fromStdString(seriesDescription).replace(")", "").toStdString();
+        seriesDescription = QString::fromStdString(seriesDescription).replace("(", "").toStdString();
+        seriesDescription = QString::fromStdString(seriesDescription).simplified().replace(" ", "").toStdString();
+        seriesDscrps.push_back(seriesDescription);
+    }//_for
+
+    //Sort indexes based on comparing values
+    std::vector<int> index(indexNodes.size());
+    std::iota(index.begin(), index.end(), 0);
+    std::sort(index.begin(), index.end(), [&](int i1, int i2) {return indexNodes[i1] < indexNodes[i2]; });
+
+    //Warning for cases when type is not found
+    size_t length1 = nodes.size();
+    size_t length2 = indexNodes.size();
+    bool test = std::adjacent_find(indexNodes.begin(), indexNodes.
