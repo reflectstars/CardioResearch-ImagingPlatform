@@ -124,4 +124,67 @@ void AtrialScarView::CreateQtPartControl(QWidget *parent) {
     connect(m_Controls.button_c, SIGNAL(clicked()), this, SLOT(ExtraCalcs()));
     connect(m_Controls.button_r, SIGNAL(clicked()), this, SLOT(ResetMain()));
 
-    //Sub-button
+    //Sub-buttons signals
+    connect(m_Controls.button_2_1, SIGNAL(clicked()), this, SLOT(ConvertNII()));
+    connect(m_Controls.button_x_1, SIGNAL(clicked()), this, SLOT(Register()));
+    connect(m_Controls.button_x_2, SIGNAL(clicked()), this, SLOT(Transform()));
+    connect(m_Controls.button_z_1, SIGNAL(clicked()), this, SLOT(SelectLandmarks()));
+    connect(m_Controls.button_z_2, SIGNAL(clicked()), this, SLOT(ClipMitralValve()));
+    connect(m_Controls.button_deb, SIGNAL(clicked()), this, SLOT(ScarDebug()));
+
+    //Set visibility of buttons
+    m_Controls.button_4->setVisible(false);
+    m_Controls.button_5->setVisible(false);
+    m_Controls.button_6->setVisible(false);
+    m_Controls.button_7->setVisible(false);
+    m_Controls.button_x->setVisible(false);
+    m_Controls.button_y->setVisible(false);
+    m_Controls.button_z->setVisible(false);
+    m_Controls.button_s->setVisible(false);
+
+    //Set visibility of sub-buttons
+    m_Controls.button_2_1->setVisible(false);
+    m_Controls.button_x_1->setVisible(false);
+    m_Controls.button_x_2->setVisible(false);
+    m_Controls.button_z_1->setVisible(false);
+    m_Controls.button_z_2->setVisible(false);
+    m_Controls.button_deb->setVisible(false);
+}
+
+void AtrialScarView::SetFocus() {
+    m_Controls.button_1->setFocus();
+}
+
+void AtrialScarView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*source*/, const QList<mitk::DataNode::Pointer>& /*nodes*/) {
+}
+
+void AtrialScarView::LoadDICOM() {
+
+    MITK_INFO << "Ask user about alternative DICOM reader";
+    int reply = QMessageBox::question(NULL, "Question", "Use alternative DICOM reader?", QMessageBox::Yes, QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+
+        QString dicomFolder = QFileDialog::getExistingDirectory(NULL, "Open folder with DICOMs.", mitk::IOUtil::GetProgramPath().c_str(), QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+        QString tmpNiftiFolder = cmd->DockerDicom2Nifti(dicomFolder);
+
+        if (tmpNiftiFolder.compare("ERROR_IN_PROCESSING") != 0) {
+
+            // add results in NIIs folder to Data Manager
+            MITK_INFO << ("Conversion succesful. Intermediate NII folder: " + tmpNiftiFolder).toStdString();
+            QMessageBox::information(NULL, "Information", "Conversion successful, press the Process Images button to continue.");
+            QDir niftiFolder(tmpNiftiFolder);
+            QStringList niftiFiles = niftiFolder.entryList();
+
+            if (niftiFiles.size() > 0) {
+
+                QString thisFile, path;
+                for (int ix = 0; ix < niftiFiles.size(); ix++) {
+
+                    // load here files
+                    thisFile = niftiFiles.at(ix);
+                    if (thisFile.contains(".nii", Qt::CaseSensitive)) {
+                        if (thisFile.contains("lge", Qt::CaseInsensitive) || thisFile.contains("mra", Qt::CaseInsensitive)) {
+
+                            path = niftiFolder.absolutePath() + "/" + thisFile
