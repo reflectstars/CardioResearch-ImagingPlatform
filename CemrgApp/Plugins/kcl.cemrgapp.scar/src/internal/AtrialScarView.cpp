@@ -261,4 +261,88 @@ void AtrialScarView::ConvertNII() {
     //Warning for cases when type is not found
     size_t length1 = nodes.size();
     size_t length2 = indexNodes.size();
-    bool test = std::adjacent_find(indexNodes.begin(), indexNodes.
+    bool test = std::adjacent_find(indexNodes.begin(), indexNodes.end(), std::not_equal_to<int>()) == indexNodes.end();
+    if (length1 != length2 || test) {
+        QMessageBox::warning(NULL, "Attention",
+            "Cannot find the type of images automatically. Revert to user order and selections in the data manager: LGE at the top, then CEMRA at the bottom!");
+        index.resize(nodes.size());
+        std::iota(index.begin(), index.end(), 0);
+    }//_if
+
+    //Convert to Nifti
+    int ctr = 0;
+    QString path, type;
+    bool resampleImage = true, reorientToRAI = true;
+
+    this->BusyCursorOn();
+    mitk::ProgressBar::GetInstance()->AddStepsToDo(index.size());
+    foreach (int idx, index) {
+        type = (ctr == 0) ? "LGE" : "MRA";
+        path = directory + "/dcm-" + type + "-" + seriesDscrps.at(idx).c_str() + ".nii";
+        bool successfulNitfi = CemrgCommonUtils::ConvertToNifti(nodes.at(idx)->GetData(), path, resampleImage, reorientToRAI);
+        if (successfulNitfi) {
+            this->GetDataStorage()->Remove(nodes.at(idx));
+            std::string key = "dicom.series.SeriesDescription";
+            mitk::DataStorage::SetOfObjects::Pointer set = mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+            set->Begin().Value()->GetData()->GetPropertyList()->SetStringProperty(key.c_str(), seriesDscrps.at(idx).c_str());
+            ctr++;
+        } else {
+            mitk::ProgressBar::GetInstance()->Progress(index.size());
+            return;
+        }//_if
+        mitk::ProgressBar::GetInstance()->Progress();
+    }//for
+    nodes.clear();
+    this->BusyCursorOff();
+
+    MITK_INFO << "Loading all items";
+    mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+}
+
+void AtrialScarView::AnalysisChoice() {
+
+    int reply = QMessageBox::question(
+        NULL, "Question", "Do you want an automatic analysis?", QMessageBox::Yes, QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+
+        MITK_INFO << "Setting up automatic analysis.";
+        AutomaticAnalysis();
+
+    } else {
+
+        MITK_INFO << "Setting up manual analysis.";
+
+        //Set visibility of buttons
+        m_Controls.button_4->setVisible(true);
+        m_Controls.button_5->setVisible(true);
+        m_Controls.button_6->setVisible(true);
+        m_Controls.button_7->setVisible(true);
+        m_Controls.button_x->setVisible(true);
+        m_Controls.button_y->setVisible(true);
+        m_Controls.button_z->setVisible(true);
+        m_Controls.button_s->setVisible(true);
+    }//_if
+}
+
+void AtrialScarView::AutomaticAnalysis() {
+
+    MITK_INFO << "Performing automatic analysis.";
+    MITK_INFO << "============= Automatic segmentation module ====================";
+
+    QString direct, mraPath, lgePath, cnnPath;
+    bool debugging = true;
+
+    if (directory.isEmpty()) {
+        direct = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory",
+            mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        directory = direct;
+    } else {
+        direct = directory;
+    }//_dir
+
+    QDirIterator searchit(direct, QDirIterator::Subdirectories);
+
+    MITK_INFO(debuggi
