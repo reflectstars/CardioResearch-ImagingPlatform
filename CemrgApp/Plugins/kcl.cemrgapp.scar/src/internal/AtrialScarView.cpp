@@ -345,4 +345,72 @@ void AtrialScarView::AutomaticAnalysis() {
 
     QDirIterator searchit(direct, QDirIterator::Subdirectories);
 
-    MITK_INFO(debuggi
+    MITK_INFO(debugging) << "[DEBUG] Searching for CEMRGNET output";
+
+    while (searchit.hasNext()) {
+        QFileInfo searchfinfo(searchit.next());
+        if (searchfinfo.fileName().contains(".nii", Qt::CaseSensitive)) {
+            if (searchfinfo.fileName().contains("dcm-LGE", Qt::CaseSensitive))
+                lgePath = searchfinfo.absoluteFilePath();
+
+            if (searchfinfo.fileName().contains("dcm-MRA", Qt::CaseSensitive))
+                mraPath = searchfinfo.absoluteFilePath();
+
+            if (debugging && searchfinfo.fileName().contains("LA-cemrgnet.nii", Qt::CaseSensitive))
+                cnnPath = searchfinfo.absoluteFilePath();
+        }
+    }//_while
+
+    QDialog* inputs = new QDialog(0, 0);
+    m_UIcemrgnet.setupUi(inputs);
+    connect(m_UIcemrgnet.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+    connect(m_UIcemrgnet.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+    int dialogCode = inputs->exec();
+
+    QString meType_UI;
+    int minStep_UI = -1, maxStep_UI = 3;
+    int methodType_UI = 2, thresh_methodType_UI = 1;
+    QStringList separated_thresh_list;
+    std::vector<double> values_vector;
+
+    if (dialogCode == QDialog::Accepted) {
+
+        MITK_INFO << "[UI] User inputs being selected.";
+        MITK_INFO << "[UI] Intensity projection";
+        bool ok1, ok2;
+        minStep_UI = m_UIcemrgnet.minStep_lineEdit->text().toInt(&ok1);
+        maxStep_UI = m_UIcemrgnet.maxStep_lineEdit->text().toInt(&ok2);
+        if (!ok1) minStep_UI = -1;
+        if (!ok2) maxStep_UI = 3;
+
+        methodType_UI = m_UIcemrgnet.maxProjection_radioButton->isChecked() ? 2 : 1;
+        meType_UI = m_UIcemrgnet.maxProjection_radioButton->isChecked() ? "Max" : "Mean";
+
+        MITK_INFO << ("[UI] Using: " + meType_UI + " Intensity projection.").toStdString();
+        MITK_INFO << ("[UI] In/out values: (" + QString::number(minStep_UI) + ", " +
+            QString::number(maxStep_UI) + ")").toStdString();
+        MITK_INFO << QString::number(methodType_UI);
+        MITK_INFO << "[UI] Thresholding information.";
+
+        //bool ok3;
+        thresh_methodType_UI = m_UIcemrgnet.iir_radioButton->isChecked() ? 1 : 2;
+        QString thresh_list, whichThresh;
+
+        if (m_UIcemrgnet.iir_radioButton->isChecked()) { // IIR method
+            whichThresh = "IIR";
+            thresh_list = m_UIcemrgnet.iir_textEdit->toPlainText();
+            separated_thresh_list << "0.97" << "1.16";
+        } else if (m_UIcemrgnet.meanSD_radioButton->isChecked()) { // SDev method
+            whichThresh = "MEAN+SD";
+            thresh_list = m_UIcemrgnet.meanSD_textEdit->toPlainText();
+            separated_thresh_list << "2.3" << "3.3";
+        }
+
+        MITK_INFO << ("[UI] Threshold: " + whichThresh).toStdString();
+        MITK_INFO << ("[UI] Threshold list: " + thresh_list).toStdString();
+        MITK_INFO << QString::number(thresh_methodType_UI);
+
+        thresh_list.remove(" ", Qt::CaseSensitive);
+        if (!thresh_list.isEmpty()) {
+
+            MITK_INFO << "[UI] Creating list of thresh
