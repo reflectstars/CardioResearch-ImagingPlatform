@@ -484,4 +484,57 @@ void AtrialScarView::AutomaticAnalysis() {
             resizeFilter->SetResizeMethodToOutputDimensions();
             resizeFilter->SetOutputDimensions(mraIMG->GetDimension(0), mraIMG->GetDimension(1), mraIMG->GetDimension(2));
             resizeFilter->InterpolateOff();
-          
+            resizeFilter->SetInputData(cnnIMG->GetVtkImageData());
+            resizeFilter->Update();
+
+            vtkSmartPointer<vtkImageChangeInformation> changeFilter = vtkSmartPointer<vtkImageChangeInformation>::New();
+            changeFilter->SetInputConnection(resizeFilter->GetOutputPort());
+            changeFilter->SetOutputSpacing(spacing);
+            changeFilter->SetOutputOrigin(origin);
+            changeFilter->Update();
+
+            cnnIMG->Initialize(changeFilter->GetOutput());
+            cnnIMG->SetVolume(changeFilter->GetOutput()->GetScalarPointer());
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][2] Image registration";
+            cnnPath = direct + "/LA.nii";
+            QString laregPath = direct + "/LA-reg.nii";
+
+            mitk::IOUtil::Save(cnnIMG, cnnPath.toStdString());
+            cmd->ExecuteRegistration(direct, lgePath, mraPath); // rigid.dof is the default name
+            cmd->ExecuteTransformation(direct, cnnPath, laregPath);
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][3] Clean segmentation";
+            typedef itk::ImageRegionIteratorWithIndex<ImageTypeCHAR> ItType;
+            typedef itk::ConnectedComponentImageFilter<ImageTypeCHAR, ImageTypeCHAR> ConnectedComponentImageFilterType;
+            typedef itk::LabelShapeKeepNObjectsImageFilter<ImageTypeCHAR> LabelShapeKeepNObjImgFilterType;
+            using DuplicatorType = itk::ImageDuplicator<ImageTypeCHAR>;
+
+            ImageTypeCHAR::Pointer orgSegImage = ImageTypeCHAR::New();
+            mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(laregPath.toStdString()), orgSegImage);
+
+            ConnectedComponentImageFilterType::Pointer connected1 = ConnectedComponentImageFilterType::New();
+            connected1->SetInput(orgSegImage);
+            connected1->Update();
+
+            LabelShapeKeepNObjImgFilterType::Pointer lblShpKpNObjImgFltr1 = LabelShapeKeepNObjImgFilterType::New();
+            lblShpKpNObjImgFltr1->SetInput(connected1->GetOutput());
+            lblShpKpNObjImgFltr1->SetBackgroundValue(0);
+            lblShpKpNObjImgFltr1->SetNumberOfObjects(1);
+            lblShpKpNObjImgFltr1->SetAttribute(LabelShapeKeepNObjImgFilterType::LabelObjectType::NUMBER_OF_PIXELS);
+            lblShpKpNObjImgFltr1->Update();
+
+            DuplicatorType::Pointer duplicator = DuplicatorType::New();
+            duplicator->SetInputImage(lblShpKpNObjImgFltr1->GetOutput());
+            duplicator->Update();
+            ItType itDUP(duplicator->GetOutput(), duplicator->GetOutput()->GetRequestedRegion());
+            for (itDUP.GoToBegin(); !itDUP.IsAtEnd(); ++itDUP)
+                if ((int)itDUP.Get() != 0)
+                    itDUP.Set(1);
+            QString segCleanPath = direct + "/prodClean.nii";
+            mitk::IOUtil::Save(mitk::ImportItkImage(duplicator->GetOutput()), segCleanPath.toStdString());
+            MITK_INFO << ("[...][3.1] Saved file: " + segCleanPath).toStdString();
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][4] Vein clipping mesh";
+            QString output1 = cmd->ExecuteSurf(direct, segCleanPath, "close", 1, .5, 0, 10);
+            mitk::Surface::Pointer shell = mitk::IOUtil
