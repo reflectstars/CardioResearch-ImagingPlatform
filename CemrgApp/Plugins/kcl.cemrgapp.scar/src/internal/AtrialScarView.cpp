@@ -537,4 +537,62 @@ void AtrialScarView::AutomaticAnalysis() {
 
             MITK_INFO << "[AUTOMATIC_ANALYSIS][4] Vein clipping mesh";
             QString output1 = cmd->ExecuteSurf(direct, segCleanPath, "close", 1, .5, 0, 10);
-            mitk::Surface::Pointer shell = mitk::IOUtil
+            mitk::Surface::Pointer shell = mitk::IOUtil::Load<mitk::Surface>(output1.toStdString());
+            vtkSmartPointer<vtkDecimatePro> deci = vtkSmartPointer<vtkDecimatePro>::New();
+            deci->SetInputData(shell->GetVtkPolyData());
+            deci->SetTargetReduction(0.1);
+            deci->PreserveTopologyOn();
+            deci->Update();
+            shell->SetVtkPolyData(deci->GetOutput());
+
+            vtkSmartPointer<vtkPointLocator> pointLocator = vtkSmartPointer<vtkPointLocator>::New();
+            vtkSmartPointer<vtkPolyData> pd = shell->Clone()->GetVtkPolyData();
+            for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+                double* point = pd->GetPoint(i);
+                point[0] = -point[0];
+                point[1] = -point[1];
+                pd->GetPoints()->SetPoint(i, point);
+            }//_for
+            pointLocator->SetDataSet(pd);
+            pointLocator->BuildLocator();
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][5] Separate veins";
+            typedef itk::BinaryCrossStructuringElement<ImageTypeCHAR::PixelType, 3> CrossType;
+            typedef itk::BinaryMorphologicalOpeningImageFilter<ImageTypeCHAR, ImageTypeCHAR, CrossType> MorphFilterType;
+            typedef itk::RelabelComponentImageFilter<ImageTypeCHAR, ImageTypeCHAR> RelabelFilterType;
+
+            ImageTypeCHAR::Pointer veinsSegImage = lblShpKpNObjImgFltr1->GetOutput();
+            ItType itORG(orgSegImage, orgSegImage->GetRequestedRegion());
+            ItType itVEN(veinsSegImage, veinsSegImage->GetRequestedRegion());
+            itORG.GoToBegin();
+
+            for (itVEN.GoToBegin(); !itVEN.IsAtEnd(); ++itVEN) {
+                if ((int)itVEN.Get() != 0)
+                    itVEN.Set((int)itORG.Get());
+                ++itORG;
+            }
+            for (itVEN.GoToBegin(); !itVEN.IsAtEnd(); ++itVEN)
+                if ((int)itVEN.Get() != 2)
+                    itVEN.Set(0);
+
+            CrossType binaryCross;
+            binaryCross.SetRadius(2.0);
+            binaryCross.CreateStructuringElement();
+            MorphFilterType::Pointer morphFilter = MorphFilterType::New();
+            morphFilter->SetInput(veinsSegImage);
+            morphFilter->SetKernel(binaryCross);
+            morphFilter->SetForegroundValue(2);
+            morphFilter->SetBackgroundValue(0);
+            morphFilter->UpdateLargestPossibleRegion();
+            veinsSegImage = morphFilter->GetOutput();
+            mitk::IOUtil::Save(mitk::ImportItkImage(veinsSegImage), (direct + "/prodVeins.nii").toStdString());
+
+            ConnectedComponentImageFilterType::Pointer connected2 = ConnectedComponentImageFilterType::New();
+            connected2->SetInput(veinsSegImage);
+            connected2->Update();
+
+            RelabelFilterType::Pointer relabeler = RelabelFilterType::New();
+            relabeler->SetInput(connected2->GetOutput());
+            relabeler->Update();
+            mitk::IOUtil::Save(mitk::ImportItkImage(relabeler->GetOutput()), (direct + "/prodSeparatedVeins.nii").toStdString());
+            MITK_INFO << ("[...][5.1] Saved file: " + direct + "/prodSeparatedVeins.nii").toStd
