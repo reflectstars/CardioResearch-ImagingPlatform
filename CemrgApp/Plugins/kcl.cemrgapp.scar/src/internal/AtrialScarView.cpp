@@ -413,4 +413,75 @@ void AtrialScarView::AutomaticAnalysis() {
         thresh_list.remove(" ", Qt::CaseSensitive);
         if (!thresh_list.isEmpty()) {
 
-            MITK_INFO << "[UI] Creating list of thresh
+            MITK_INFO << "[UI] Creating list of thresholds";
+            separated_thresh_list.removeLast();
+            separated_thresh_list.removeLast();
+            separated_thresh_list = thresh_list.split(",", QString::SkipEmptyParts);
+            int listspaces = separated_thresh_list.removeAll(" ");
+            int listduplicates = separated_thresh_list.removeDuplicates();
+            separated_thresh_list.sort();
+            if (debugging) {
+                MITK_INFO << ("[UI][DEBUG] Spaces: " + QString::number(listspaces)).toStdString();
+                MITK_INFO << ("[UI][DEBUG] Duplicates: " + QString::number(listduplicates)).toStdString();
+            }
+
+        }//_if
+
+        for (int ix = 0; ix < separated_thresh_list.size(); ix++) {
+            MITK_INFO << separated_thresh_list.at(ix);
+            bool vOK;
+            double tryNumber = separated_thresh_list.at(ix).toDouble(&vOK);
+            if (vOK) values_vector.push_back(tryNumber);
+        }
+
+        inputs->close();
+        inputs->deleteLater();
+
+    } else if (dialogCode == QDialog::Rejected) {
+
+        MITK_INFO << "[ATTENTION] Cancelled automatic analysis.";
+        QMessageBox::warning(
+            NULL, "Automatic analysis cancelled",
+            "'Cancel' button pressed, no calculations were made.");
+        inputs->close();
+        inputs->deleteLater();
+        return;
+
+    }//_if
+
+    MITK_INFO << ("Files to be read: \n\n [LGE]: " + lgePath + "\n [MRA]: " + mraPath).toStdString();
+
+    if (!mraPath.isEmpty()) {
+
+        vtkSmartPointer<vtkTimerLog> timerLog = vtkSmartPointer<vtkTimerLog>::New();
+        typedef itk::Image<short, 3> ImageTypeSHRT;
+        typedef itk::Image<short, 3> ImageTypeCHAR;
+        std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+        MITK_INFO << "[AUTOMATIC_ANALYSIS] Setting Docker on MIRTK to OFF";
+        cmd->SetUseDockerContainers(_useDockerInPlugin);
+
+        timerLog->StartTimer();
+        if (cnnPath.isEmpty()) {
+            MITK_INFO << "[AUTOMATIC_ANALYSIS] Computing automatic segmentation step.";
+            cnnPath = cmd->DockerCemrgNetPrediction(mraPath);
+        }
+
+        MITK_INFO << "Round pixel values from automatic segmentation.";
+        CemrgCommonUtils::RoundPixelValues(cnnPath);
+
+        if (!cnnPath.isEmpty()) {
+
+            MITK_INFO << ("Successful prediction with file " + cnnPath).toStdString();
+            // QString direct = finfo.absolutePath();
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][1] Adjust CNN label to MRA";
+            mitk::Image::Pointer mraIMG = mitk::IOUtil::Load<mitk::Image>(mraPath.toStdString());
+            mitk::Image::Pointer cnnIMG = mitk::IOUtil::Load<mitk::Image>(cnnPath.toStdString());
+            double origin[3]; double spacing[3];
+            mraIMG->GetGeometry()->GetOrigin().ToArray(origin);
+            mraIMG->GetGeometry()->GetSpacing().ToArray(spacing);
+
+            vtkSmartPointer<vtkImageResize> resizeFilter = vtkSmartPointer<vtkImageResize>::New();
+            resizeFilter->SetResizeMethodToOutputDimensions();
+            resizeFilter->SetOutputDimensions(mraIMG->GetDimension(0), mraIMG->GetDimension(1), mraIMG->GetDimension(2));
+            resizeFilter->InterpolateOff();
+          
