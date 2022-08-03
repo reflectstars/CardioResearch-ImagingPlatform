@@ -595,4 +595,65 @@ void AtrialScarView::AutomaticAnalysis() {
             relabeler->SetInput(connected2->GetOutput());
             relabeler->Update();
             mitk::IOUtil::Save(mitk::ImportItkImage(relabeler->GetOutput()), (direct + "/prodSeparatedVeins.nii").toStdString());
-            MITK_INFO << ("[...][5.1] Saved file: " + direct + "/prodSeparatedVeins.nii").toStd
+            MITK_INFO << ("[...][5.1] Saved file: " + direct + "/prodSeparatedVeins.nii").toStdString();
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][6] Find vein landmark";
+            veinsSegImage = relabeler->GetOutput();
+            ItType itLMK(veinsSegImage, veinsSegImage->GetRequestedRegion());
+            vtkSmartPointer<vtkIdList> pickedSeedIds = vtkSmartPointer<vtkIdList>::New();
+            pickedSeedIds->Initialize();
+            std::vector<std::vector<double>> veinsCentre;
+            const int nveins = static_cast<int>(connected2->GetObjectCount());
+
+            MITK_INFO << ("[...][6.1] Number of veins found: " + QString::number(nveins)).toStdString();
+            for (int j = 0; j < nveins; j++) {
+                int ctrVeinsVoxels = 0;
+                std::vector<double> veinLandmark(3, 0.0);
+                for (itLMK.GoToBegin(); !itLMK.IsAtEnd(); ++itLMK) {
+                    if ((int)itLMK.Get() == (j + 1)) {
+                        ImageTypeCHAR::PointType point;
+                        veinsSegImage->TransformIndexToPhysicalPoint(itLMK.GetIndex(), point);
+                        veinLandmark[0] += point[0];
+                        veinLandmark[1] += point[1];
+                        veinLandmark[2] += point[2];
+                        ctrVeinsVoxels++;
+                    }
+                }//_for
+                veinLandmark[0] /= ctrVeinsVoxels;
+                veinLandmark[1] /= ctrVeinsVoxels;
+                veinLandmark[2] /= ctrVeinsVoxels;
+                veinsCentre.push_back(veinLandmark);
+            }//_nveins
+            for (int j = 0; j < nveins; j++) {
+                double veinLandmark[3];
+                veinLandmark[0] = veinsCentre.at(j)[0];
+                veinLandmark[1] = veinsCentre.at(j)[1];
+                veinLandmark[2] = veinsCentre.at(j)[2];
+                vtkIdType id = pointLocator->FindClosestPoint(veinLandmark);
+                pickedSeedIds->InsertNextId(id);
+            }//_nveins
+            std::vector<int> pickedSeedLabels;
+            for (int j = 0; j < nveins; j++)
+                pickedSeedLabels.push_back(21);
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][7] Clip the veins";
+
+            std::unique_ptr<CemrgAtriaClipper> clipper(new CemrgAtriaClipper(direct, shell));
+            bool successful = clipper->ComputeCtrLines(pickedSeedLabels, pickedSeedIds, true);
+            if (!successful) {
+                QMessageBox::critical(NULL, "Attention", "Computation of Centrelines Failed!");
+                return;
+            }//_Check for failure
+            MITK_INFO << "[...][7.1] ComputeCtrLines finished .";
+
+            successful = clipper->ComputeCtrLinesClippers(pickedSeedLabels);
+            if (!successful) {
+                QMessageBox::critical(NULL, "Attention", "Computation of Clipper Planes Failed!");
+                return;
+            }//_if
+            MITK_INFO << "[...][7.2] ComputeCtrLinesClippers finished .";
+
+            clipper->ClipVeinsImage(pickedSeedLabels, mitk::ImportItkImage(duplicator->GetOutput()), false);
+            MITK_INFO << "[...][7.3] ClipVeinsImage finished .";
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][8] C
