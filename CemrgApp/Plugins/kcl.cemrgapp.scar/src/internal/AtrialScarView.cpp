@@ -755,4 +755,57 @@ void AtrialScarView::AutomaticAnalysis() {
             cell_to_point->Update();
             scarShell->SetVtkPolyData(cell_to_point->GetPolyDataOutput());
             mitk::IOUtil::Save(scarShell, (direct + "/MaxScar.vtk").toStdString());
-            scar->SaveSca
+            scar->SaveScarDebugImage("Max_debugScar.nii", direct);
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][11] Thresholding";
+            int vxls = 3;
+            int threshType = thresh_methodType_UI;
+
+            typedef itk::Image<float, 3> ImageType;
+            typedef itk::BinaryBallStructuringElement<ImageTypeCHAR::PixelType, 3> BallType;
+            typedef itk::GrayscaleErodeImageFilter<ImageTypeCHAR, ImageType, BallType> ErosionFilterType;
+            BallType binaryBall;
+            binaryBall.SetRadius(vxls);
+            binaryBall.CreateStructuringElement();
+            ErosionFilterType::Pointer erosionFilter = ErosionFilterType::New();
+            erosionFilter->SetInput(segITK);
+            erosionFilter->SetKernel(binaryBall);
+            erosionFilter->UpdateLargestPossibleRegion();
+            mitk::Image::Pointer roiImage = mitk::ImportItkImage(erosionFilter->GetOutput())->Clone();
+            ImageType::Pointer lgeFloat = ImageType::New();
+            mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(lgePath.toStdString()), lgeFloat);
+            double mean = 0.0, stdv = 0.0;
+            scar->CalculateMeanStd(mitk::ImportItkImage(lgeFloat), roiImage, mean, stdv);
+            MITK_INFO << "[...][11.1] Creating Scar map normalised by Mean blood pool.";
+            QString prodPath = direct + "/";
+            scar->SaveNormalisedScalars(mean, scarShell, (prodPath + "MaxScar_Normalised.vtk"));
+            MITK_INFO << "[...][11.2] Saving to files.";
+            ofstream prodFile1, prodFileExplanation;
+            prodFile1.open((prodPath + "prodThresholds.txt").toStdString());
+            for (unsigned int ix = 0; ix < values_vector.size(); ix++) {
+                double thisValue = values_vector.at(ix);
+                double thisThresh = (threshType == 1) ? mean * thisValue : mean + thisValue * stdv;
+                double thisPercentage = scar->Thresholding(thisThresh);
+                prodFile1 << thisValue << "\n";
+                prodFile1 << threshType << "\n";
+                prodFile1 << mean << "\n";
+                prodFile1 << stdv << "\n";
+                prodFile1 << thisThresh << "\n";
+                prodFile1 << "SCORE: " << thisPercentage << "\n";
+                prodFile1 << "=============== separation ================\n";
+            }
+            prodFileExplanation.open((prodPath + "prodThresholds_Guide.txt").toStdString());
+            prodFileExplanation << "VALUE\n";
+            prodFileExplanation << "THRESHOLD TYPE: (1 = V*IIR, 2 = MEAN + V*STDev)\n";
+            prodFileExplanation << "MEAN INTENSITY\n";
+            prodFileExplanation << "STANDARD DEVIATION (STDev)\n";
+            prodFileExplanation << "THRESHOLD\n";
+            prodFileExplanation << "SCAR SCORE (percentage)\n";
+            prodFileExplanation << "=============== separation ================";
+            prodFile1.close();
+            prodFileExplanation.close();
+            timerLog->StopTimer();
+
+            QStringList rtminsec = QString::number(timerLog->GetElapsedTime() / 60).split(".");
+            QString rtmin = rtminsec.at(0);
+            QString rtsec = QString::number
