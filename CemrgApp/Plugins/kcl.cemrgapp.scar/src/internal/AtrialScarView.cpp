@@ -702,4 +702,57 @@ void AtrialScarView::AutomaticAnalysis() {
             mvclipper->Update();
 
             MITK_INFO << "[...][9.1] Extract and clean surface mesh.";
-            vtkSmartPointer<vtkDataSetSurfaceFilter> surfer = vtkSmartPointer<vtkDataSe
+            vtkSmartPointer<vtkDataSetSurfaceFilter> surfer = vtkSmartPointer<vtkDataSetSurfaceFilter>::New();
+            surfer->SetInputData(mvclipper->GetOutput());
+            surfer->Update();
+
+            MITK_INFO << "[...][9.2] Cleaning...";
+            vtkSmartPointer<vtkCleanPolyData> clean = vtkSmartPointer<vtkCleanPolyData>::New();
+            clean->SetInputConnection(surfer->GetOutputPort());
+            clean->Update();
+
+            MITK_INFO << "[...][9.3] Largest region...";
+            vtkSmartPointer<vtkPolyDataConnectivityFilter> lrgRegion = vtkSmartPointer<vtkPolyDataConnectivityFilter>::New();
+            lrgRegion->SetInputConnection(clean->GetOutputPort());
+            lrgRegion->SetExtractionModeToLargestRegion();
+            lrgRegion->Update();
+            clean = vtkSmartPointer<vtkCleanPolyData>::New();
+            clean->SetInputConnection(lrgRegion->GetOutputPort());
+            clean->Update();
+
+            MITK_INFO << ("[...][9.4] Saving to file: " + output2).toStdString();
+            LAShell->SetVtkPolyData(clean->GetOutput());
+            mitk::IOUtil::Save(LAShell, output2.toStdString());
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][10] Scar projection";
+            int minStep = minStep_UI;
+            int maxStep = maxStep_UI;
+            int methodType = methodType_UI;
+            std::unique_ptr<CemrgScar3D> scar(new CemrgScar3D());
+            scar->SetMinStep(minStep);
+            scar->SetMaxStep(maxStep);
+            scar->SetMethodType(methodType);
+            ImageTypeCHAR::Pointer segITK = ImageTypeCHAR::New();
+            mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>((direct + "/PVeinsCroppedImage.nii").toStdString()), segITK);
+            ImageTypeSHRT::Pointer lgeITK = ImageTypeSHRT::New();
+            mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(lgePath.toStdString()), lgeITK);
+            itk::ResampleImageFilter<ImageTypeCHAR, ImageTypeCHAR>::Pointer resampleFilter;
+            resampleFilter = itk::ResampleImageFilter<ImageTypeCHAR, ImageTypeCHAR>::New();
+            resampleFilter->SetInput(segITK);
+            resampleFilter->SetReferenceImage(lgeITK);
+            resampleFilter->SetUseReferenceImage(true);
+            resampleFilter->SetInterpolator(itk::NearestNeighborInterpolateImageFunction<ImageTypeCHAR>::New());
+            resampleFilter->SetDefaultPixelValue(0);
+            resampleFilter->UpdateLargestPossibleRegion();
+            segITK = resampleFilter->GetOutput();
+            mitk::IOUtil::Save(mitk::ImportItkImage(segITK), (direct + "/PVeinsCroppedImage.nii").toStdString());
+            scar->SetScarSegImage(mitk::ImportItkImage(segITK));
+            mitk::Surface::Pointer scarShell = scar->Scar3D(direct.toStdString(), mitk::ImportItkImage(lgeITK));
+            MITK_INFO << "[...][10.1] Converting cell to point data";
+            vtkSmartPointer<vtkCellDataToPointData> cell_to_point = vtkSmartPointer<vtkCellDataToPointData>::New();
+            cell_to_point->SetInputData(scarShell->GetVtkPolyData());
+            cell_to_point->PassCellDataOn();
+            cell_to_point->Update();
+            scarShell->SetVtkPolyData(cell_to_point->GetPolyDataOutput());
+            mitk::IOUtil::Save(scarShell, (direct + "/MaxScar.vtk").toStdString());
+            scar->SaveSca
