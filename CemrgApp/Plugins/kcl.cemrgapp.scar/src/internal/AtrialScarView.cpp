@@ -656,4 +656,50 @@ void AtrialScarView::AutomaticAnalysis() {
             clipper->ClipVeinsImage(pickedSeedLabels, mitk::ImportItkImage(duplicator->GetOutput()), false);
             MITK_INFO << "[...][7.3] ClipVeinsImage finished .";
 
-            MITK_INFO << "[AUTOMATIC_ANALYSIS][8] C
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][8] Create a mesh from clipped segmentation of veins";
+            QString output2 = cmd->ExecuteSurf(direct, (direct + "/PVeinsCroppedImage.nii"), "close", 1, .5, 0, 10);
+            mitk::Surface::Pointer LAShell = mitk::IOUtil::Load<mitk::Surface>(output2.toStdString());
+
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][9] Clip the mitral valve";
+            ImageTypeCHAR::Pointer mvImage = ImageTypeCHAR::New();
+            mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(segCleanPath.toStdString()), mvImage);
+            ItType itMVI1(mvImage, mvImage->GetRequestedRegion());
+            itORG.GoToBegin();
+            for (itMVI1.GoToBegin(); !itMVI1.IsAtEnd(); ++itMVI1) {
+                if ((int)itMVI1.Get() != 0)
+                    itMVI1.Set((int)itORG.Get());
+                ++itORG;
+            }
+            for (itMVI1.GoToBegin(); !itMVI1.IsAtEnd(); ++itMVI1)
+                if ((int)itMVI1.Get() != 3)
+                    itMVI1.Set(0);
+            typedef itk::ConnectedComponentImageFilter<ImageTypeCHAR, ImageTypeCHAR> ConnectedComponentImageFilterType;
+            ConnectedComponentImageFilterType::Pointer connected3 = ConnectedComponentImageFilterType::New();
+            connected3->SetInput(mvImage);
+            connected3->Update();
+            typedef itk::LabelShapeKeepNObjectsImageFilter<ImageTypeCHAR> LabelShapeKeepNObjImgFilterType;
+            LabelShapeKeepNObjImgFilterType::Pointer lblShpKpNObjImgFltr2 = LabelShapeKeepNObjImgFilterType::New();
+            lblShpKpNObjImgFltr2->SetInput(connected3->GetOutput());
+            lblShpKpNObjImgFltr2->SetBackgroundValue(0);
+            lblShpKpNObjImgFltr2->SetNumberOfObjects(1);
+            lblShpKpNObjImgFltr2->SetAttribute(LabelShapeKeepNObjImgFilterType::LabelObjectType::NUMBER_OF_PIXELS);
+            lblShpKpNObjImgFltr2->Update();
+            mvImage = lblShpKpNObjImgFltr2->GetOutput();
+            mitk::IOUtil::Save(mitk::ImportItkImage(mvImage), (direct + "/prodMVI.nii").toStdString());
+
+            // Make vtk of prodMVI
+            QString mviShellPath = cmd->ExecuteSurf(direct, "prodMVI.nii", "close", 1, 0.5, 0, 10);
+            // Implement code from command line tool
+            mitk::Surface::Pointer ClipperSurface = mitk::IOUtil::Load<mitk::Surface>(mviShellPath.toStdString());
+            vtkSmartPointer<vtkImplicitPolyDataDistance> implicitFn = vtkSmartPointer<vtkImplicitPolyDataDistance>::New();
+            implicitFn->SetInput(ClipperSurface->GetVtkPolyData());
+            vtkMTimeType mtime = implicitFn->GetMTime();
+            std::cout << "MTime: " << mtime << std::endl;
+            vtkSmartPointer<vtkClipPolyData> mvclipper = vtkSmartPointer<vtkClipPolyData>::New();
+            mvclipper->SetClipFunction(implicitFn);
+            mvclipper->SetInputData(LAShell->GetVtkPolyData());
+            mvclipper->InsideOutOff();
+            mvclipper->Update();
+
+            MITK_INFO << "[...][9.1] Extract and clean surface mesh.";
+            vtkSmartPointer<vtkDataSetSurfaceFilter> surfer = vtkSmartPointer<vtkDataSe
