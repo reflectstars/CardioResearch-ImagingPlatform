@@ -808,4 +808,71 @@ void AtrialScarView::AutomaticAnalysis() {
 
             QStringList rtminsec = QString::number(timerLog->GetElapsedTime() / 60).split(".");
             QString rtmin = rtminsec.at(0);
-            QString rtsec = QString::number
+            QString rtsec = QString::number(("0." + rtminsec.at(1)).toFloat() * 60, 'f', 1);
+            QString outstr = "Operation finshed in " + rtmin + " min and " + rtsec + " s.";
+            MITK_INFO << "[AUTOMATIC_ANALYSIS][FINISHED]";
+            QMessageBox::information(NULL, "Automatic analysis", outstr);
+
+        } else
+            QMessageBox::warning(NULL, "Attention", "Error with automatic segmentation! Check the LOG file.");
+    } else
+        QMessageBox::information(NULL, "Attention", "Operation Cancelled!");
+}
+
+void AtrialScarView::SegmentIMGS() {
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    int reply = QMessageBox::question(
+        NULL, "Question", "Do you have a segmentation to load?", QMessageBox::Yes, QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+        QString path = QFileDialog::getOpenFileName(NULL, "Open Segmentation file",
+            directory.toStdString().c_str(), QmitkIOUtil::GetFileOpenFilterString());
+        if (path.isEmpty()) return;
+        mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+        mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+        //Restore image name
+        QFileInfo fullPathInfo(path);
+        fileName = fullPathInfo.fileName();
+
+    } else {
+
+        reply = QMessageBox::question(
+            NULL, "Question", "Do you want an automatic segmentation?", QMessageBox::Yes, QMessageBox::No);
+
+        if (reply == QMessageBox::Yes) {
+
+            //Check for selection of image
+            QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+            if (nodes.size() != 1) {
+                QMessageBox::warning(NULL, "Attention", "Please select the CEMRA images from the Data Manager to segment!");
+                return;
+            }//_if
+
+            //Test if this data item is an image
+            QString mraPath;
+            mitk::BaseData::Pointer data = nodes.at(0)->GetData();
+            if (data) {
+                mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+                if (image) {
+
+                    this->BusyCursorOn();
+                    mitk::ProgressBar::GetInstance()->AddStepsToDo(2);
+
+                    MITK_INFO << "CNN prediction";
+                    mraPath = directory + "/test.nii";
+                    mitk::IOUtil::Save(image, mraPath.toStdString());
+                    std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+
+                    cmd->SetUseDockerContainers(true);
+                    QString cnnPath = cmd->DockerCemrgNetPrediction(mraPath);
+
+                    MITK_INFO << "Round pixel values from automatic segmentation.";
+                    CemrgCommonUtils::RoundPixelValues(cnnPath);
+                    mitk::ProgressBar::GetInstance()->Progress();
+
+                    //Clean prediction
+                    using ImageTypeCHAR = itk::Image<short, 3>;
+                    using ConnectedComponentImageFilterType = itk::ConnectedComponentImageFilter<ImageTyp
