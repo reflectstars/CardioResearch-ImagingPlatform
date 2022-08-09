@@ -875,4 +875,70 @@ void AtrialScarView::SegmentIMGS() {
 
                     //Clean prediction
                     using ImageTypeCHAR = itk::Image<short, 3>;
-                    using ConnectedComponentImageFilterType = itk::ConnectedComponentImageFilter<ImageTyp
+                    using ConnectedComponentImageFilterType = itk::ConnectedComponentImageFilter<ImageTypeCHAR, ImageTypeCHAR>;
+                    using LabelShapeKeepNObjImgFilterType = itk::LabelShapeKeepNObjectsImageFilter<ImageTypeCHAR>;
+
+                    ImageTypeCHAR::Pointer orgSegImage = ImageTypeCHAR::New();
+                    mitk::CastToItkImage(mitk::IOUtil::Load<mitk::Image>(cnnPath.toStdString()), orgSegImage);
+
+
+                    ConnectedComponentImageFilterType::Pointer connected = ConnectedComponentImageFilterType::New();
+                    connected->SetInput(orgSegImage);
+                    connected->Update();
+                    LabelShapeKeepNObjImgFilterType::Pointer lblShpKpNObjImgFltr = LabelShapeKeepNObjImgFilterType::New();
+                    lblShpKpNObjImgFltr->SetInput(connected->GetOutput());
+                    lblShpKpNObjImgFltr->SetBackgroundValue(0);
+                    lblShpKpNObjImgFltr->SetNumberOfObjects(1);
+                    lblShpKpNObjImgFltr->SetAttribute(LabelShapeKeepNObjImgFilterType::LabelObjectType::NUMBER_OF_PIXELS);
+                    lblShpKpNObjImgFltr->Update();
+                    mitk::Image::Pointer segImage = mitk::Image::New();
+                    mitk::CastToMitkImage(lblShpKpNObjImgFltr->GetOutput(), segImage);
+                    cnnPath = directory + "/LA.nii";
+                    mitk::IOUtil::Save(segImage, cnnPath.toStdString());
+                    mitk::IOUtil::Load(cnnPath.toStdString(), *this->GetDataStorage());
+                    remove(mraPath.toStdString().c_str());
+                    fileName = "LA.nii";
+                    QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+                    mitk::ProgressBar::GetInstance()->Progress();
+                    this->BusyCursorOff();
+
+                } else
+                    QMessageBox::warning(NULL, "Attention", "Please select a CEMRA to segment!");
+            }//_if_data
+
+        } else {
+
+            //Show the plugin
+            this->GetSite()->GetPage()->ShowView("org.mitk.views.segmentation");
+
+        }//_if_q2
+    }//_if_q1
+}
+
+/**
+ * @brief Relies on the interpolation mesh being added to DataManger
+ * @param node Contains segmentation image to be saved
+ */
+void AtrialScarView::NodeAdded(const mitk::DataNode* node) {
+
+    QString name = QString::fromStdString(node->GetName());
+    if (name.endsWith("interpolation")) {
+
+        mitk::DataStorage::SetOfObjects::ConstPointer nodes = this->GetDataStorage()->GetSources(node);
+        mitk::DataStorage::SetOfObjects::ConstIterator itSeg = nodes->Begin();
+        mitk::DataNode::Pointer segNode = itSeg->Value();
+
+        if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+        //Find the selected node
+        QString path;
+        mitk::BaseData::Pointer data = segNode->GetData();
+        if (data) {
+            //Test if this data item is an image
+            mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+            if (image) {
+
+                bool ok;
+                QString tmpFileName = fileName;
+                fileName = QInputDialog::getText(
+                    NULL, tr("Save Segmentation As"),
