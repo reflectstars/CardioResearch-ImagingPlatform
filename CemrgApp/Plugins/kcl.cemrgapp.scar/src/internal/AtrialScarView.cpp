@@ -1022,4 +1022,77 @@ void AtrialScarView::Register() {
                 lge = QString::fromStdString(_2nd->GetName());
                 mra = QString::fromStdString(_1st->GetName());
 
-        
+            } else {
+
+                QMessageBox::warning(NULL, "Attention", "Please select both LGE and CEMRA images from the Data Manager!");
+                return;
+
+            }//_if
+
+            //Commandline call
+            this->BusyCursorOn();
+            mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+            std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+            cmd->SetUseDockerContainers(_useDockerInPlugin);
+            cmd->ExecuteRegistration(directory, lge, mra);
+            QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+            mitk::ProgressBar::GetInstance()->Progress();
+            this->BusyCursorOff();
+
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please select both LGE and CEMRA images from the Data Manager!");
+            return;
+        }//_image
+    } else
+        return;
+}
+
+void AtrialScarView::Transform() {
+
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(
+        NULL, "Image Transformation",
+        "Have you completed image registration before using this step?", QMessageBox::Yes | QMessageBox::No);
+    if (reply == QMessageBox::No)
+        return;
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 1) {
+        MITK_WARN << ("[Transform] Problem with selection. Selection size: " + QString::number(nodes.size())).toStdString();
+        QMessageBox::warning(NULL, "Attention", "Please select the corresponding segmentation to transform!");
+        return;
+    }
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Find the selected node
+    QString path, pathTemp;
+    mitk::DataNode::Pointer segNode = nodes.at(0);
+    mitk::BaseData::Pointer data = segNode->GetData();
+    if (data) {
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (image) {
+
+            //Check seg node name
+            QString segNodeTest = QString::fromStdString(segNode->GetName()) + ".nii";
+            if (!fileName.contains(segNodeTest, Qt::CaseSensitive)) {
+                MITK_WARN << ("[Transform] Problem with filename: " + fileName).toStdString();
+                MITK_INFO << "[...][warning] segNode: " + segNode->GetName();
+                QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+                return;
+            }//_if
+
+            bool ok;
+            QString regFileName;
+            regFileName = fileName.left(fileName.lastIndexOf(QChar('.'))) + "-reg.nii";
+            regFileName = QInputDialog::getText(NULL, tr("Save Registration As"), tr("File Name:"), QLineEdit::Normal, regFileName, &ok);
+            if (ok && !regFileName.isEmpty() && regFileName.endsWith(".nii")) {
+
+                pathTemp = directory + "/temp.nii";
+                mitk::IOUtil::Save(image, pathTemp.toStdString());
+
+                //Commandline call
+                this->BusyCursorOn();
+   
