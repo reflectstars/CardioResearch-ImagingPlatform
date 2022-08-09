@@ -941,4 +941,85 @@ void AtrialScarView::NodeAdded(const mitk::DataNode* node) {
                 bool ok;
                 QString tmpFileName = fileName;
                 fileName = QInputDialog::getText(
-                    NULL, tr("Save Segmentation As"),
+                    NULL, tr("Save Segmentation As"), tr("File Name:"), QLineEdit::Normal, fileName, &ok);
+                if (ok && !fileName.isEmpty() && fileName.endsWith(".nii")) {
+                    segNode->SetName(fileName.left(fileName.lastIndexOf(QChar('.'))).toStdString());
+                    path = directory + "/" + fileName;
+                    mitk::IOUtil::Save(image, path.toStdString());
+                } else {
+                    fileName = tmpFileName;
+                    QMessageBox::warning(NULL, "Attention", "Please type a file name with the right extension (i.e. .nii)!");
+                    return;
+                }//_fileName
+
+            } else {
+                QMessageBox::warning(NULL, "Attention", "Segmentation image could not be saved automatically from the Data Manager!");
+                return;
+            }//_image
+        } else
+            return;
+        this->GetDataStorage()->Remove(node);
+
+    } else if (name.endsWith("PVeinsCroppedImage")) {
+
+        //Listen to image crop change
+        fileName = "PVeinsCroppedImage.nii";
+
+    }//_if
+}
+
+void AtrialScarView::Registration() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_x_1->isVisible()) {
+        m_Controls.button_x_1->setVisible(false);
+        m_Controls.button_x_2->setVisible(false);
+    } else {
+        m_Controls.button_x_1->setVisible(true);
+        m_Controls.button_x_2->setVisible(true);
+    }
+}
+
+void AtrialScarView::Register() {
+
+    QMessageBox::StandardButton reply;
+    reply = QMessageBox::question(
+        NULL, "Image Registration",
+        "Have you completed steps 1 to 4 before using this feature?", QMessageBox::Yes | QMessageBox::No);
+    if (reply == QMessageBox::No)
+        return;
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 2) {
+        MITK_INFO << ("Selection size:" + QString::number(nodes.size())).toStdString();
+        QMessageBox::warning(NULL, "Attention", "Please select both LGE and CEMRA images from the Data Manager to register!");
+        return;
+    }
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Sort the two images
+    QString lge, mra;
+    mitk::DataNode::Pointer _1st = nodes.at(0);
+    mitk::DataNode::Pointer _2nd = nodes.at(1);
+    mitk::BaseData::Pointer dat1 = _1st->GetData();
+    mitk::BaseData::Pointer dat2 = _2nd->GetData();
+
+    if (dat1 && dat2) {
+        //Test if this data items are image
+        mitk::Image::Pointer image1 = dynamic_cast<mitk::Image*>(dat1.GetPointer());
+        mitk::Image::Pointer image2 = dynamic_cast<mitk::Image*>(dat2.GetPointer());
+        if (image1 && image2) {
+
+            if (_1st->GetName().find("LGE") != _1st->GetName().npos && _2nd->GetName().find("MRA") != _2nd->GetName().npos) {
+
+                lge = QString::fromStdString(_1st->GetName());
+                mra = QString::fromStdString(_2nd->GetName());
+
+            } else if (_1st->GetName().find("MRA") != _1st->GetName().npos && _2nd->GetName().find("LGE") != _2nd->GetName().npos) {
+
+                lge = QString::fromStdString(_2nd->GetName());
+                mra = QString::fromStdString(_1st->GetName());
+
+        
