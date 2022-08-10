@@ -1095,4 +1095,74 @@ void AtrialScarView::Transform() {
 
                 //Commandline call
                 this->BusyCursorOn();
-   
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+                std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+                cmd->SetUseDockerContainers(_useDockerInPlugin);
+                cmd->ExecuteTransformation(directory, pathTemp.right(8), regFileName);
+                QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+                mitk::ProgressBar::GetInstance()->Progress();
+                this->BusyCursorOff();
+
+                //Load the new segementation
+                path = directory + "/" + regFileName;
+                mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+                remove(pathTemp.toStdString().c_str());
+
+                //Clear data manager
+                mitk::DataStorage::SetOfObjects::ConstPointer sob = this->GetDataStorage()->GetAll();
+                for (mitk::DataStorage::SetOfObjects::ConstIterator nodeIt = sob->Begin(); nodeIt != sob->End(); ++nodeIt)
+                    if (nodeIt->Value()->GetName().find("MRA") != nodeIt->Value()->GetName().npos)
+                        this->GetDataStorage()->Remove(nodeIt->Value());
+                this->GetDataStorage()->Remove(segNode);
+                fileName = regFileName;
+
+            } else {
+                QMessageBox::warning(NULL, "Attention", "Please type a file name with the right extension (i.e. .nii)!");
+                return;
+            }//_fileName
+
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+            return;
+        }//_image
+    } else
+        return;
+}
+
+void AtrialScarView::ClipPVeins() {
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Show the plugin
+    this->GetSite()->GetPage()->ResetPerspective();
+    AtrialScarClipperView::SetDirectoryFile(directory, fileName);
+    this->GetSite()->GetPage()->ShowView("org.mitk.views.scarclipper");
+}
+
+void AtrialScarView::ExtraCalcs() {
+    MITK_INFO << "[INFO] Calling view org.mitk.views.scarcalculations" << std::endl;
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Show the plugin
+    this->GetSite()->GetPage()->ResetPerspective();
+    ScarCalculationsView::SetCalculationsPaths(directory);
+    if (!ScarCalculationsView::CheckForRequiredFiles()) {
+        QMessageBox::warning(NULL, "Attention - Required files missing",
+            "Check all the files in the PRE/ANALYSIS/ and POST/ANALYSIS folders are correctly named.");
+        directory = QString();
+        return;
+    }
+    ScarCalculationsView::GetInputsFromFile();
+    this->GetSite()->GetPage()->ShowView("org.mitk.views.scarcalculations");
+}
+
+void AtrialScarView::CreateSurf() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 1) {
+        QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation to create a surface!");
+        return;
+    }
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> r
