@@ -1165,4 +1165,71 @@ void AtrialScarView::CreateSurf() {
         return;
     }
 
-    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> r
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Find the selected node
+    QString path, pathTemp;
+    mitk::DataNode::Pointer segNode = nodes.at(0);
+    mitk::BaseData::Pointer data = segNode->GetData();
+    if (data) {
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (image) {
+
+            //Check seg node name
+            if (segNode->GetName().compare(fileName.left(fileName.lastIndexOf(QChar('.'))).toStdString()) != 0) {
+                QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+                return;
+            }//_if
+
+            //Ask for user input to set the parameters
+            QDialog* inputs = new QDialog(0, 0);
+            m_UIMeshing.setupUi(inputs);
+            connect(m_UIMeshing.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+            connect(m_UIMeshing.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+            int dialogCode = inputs->exec();
+
+            //Act on dialog return code
+            if (dialogCode == QDialog::Accepted) {
+
+                bool ok1, ok2, ok3, ok4;
+                int iter = m_UIMeshing.lineEdit_1->text().toInt(&ok1);
+                float th = m_UIMeshing.lineEdit_2->text().toFloat(&ok2);
+                int blur = m_UIMeshing.lineEdit_3->text().toInt(&ok3);
+                int smth = m_UIMeshing.lineEdit_4->text().toInt(&ok4);
+
+                //Set default values
+                if (!ok1 || !ok2 || !ok3 || !ok4)
+                    QMessageBox::warning(NULL, "Attention", "Reverting to default parameters!");
+                if (!ok1) iter = 1;
+                if (!ok2) th = 0.5;
+                if (!ok3) blur = 0;
+                if (!ok4) smth = 10;
+                //_if
+
+                this->BusyCursorOn();
+                pathTemp = directory + "/temp.nii";
+                mitk::IOUtil::Save(image, pathTemp.toStdString());
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(3);
+                std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+                cmd->SetUseDockerContainers(_useDockerInPlugin);
+                path = cmd->ExecuteSurf(directory, pathTemp, "close", iter, th, blur, smth);
+                QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+                this->BusyCursorOff();
+
+                //Add the mesh to storage
+                std::string meshName = segNode->GetName() + "-Mesh";
+                CemrgCommonUtils::AddToStorage(
+                    CemrgCommonUtils::LoadVTKMesh(path.toStdString()), meshName, this->GetDataStorage());
+                inputs->deleteLater();
+                remove(pathTemp.toStdString().c_str());
+
+            } else if (dialogCode == QDialog::Rejected) {
+                inputs->close();
+                inputs->deleteLater();
+            }//_if
+
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+            return;
+        }/
