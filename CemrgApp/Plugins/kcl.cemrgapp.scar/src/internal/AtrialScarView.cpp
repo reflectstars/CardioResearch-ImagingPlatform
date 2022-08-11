@@ -1232,4 +1232,84 @@ void AtrialScarView::CreateSurf() {
         } else {
             QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
             return;
-        }/
+        }//_image
+    } else
+        return;
+}
+
+void AtrialScarView::ClipperMV() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_z_1->isVisible()) {
+        m_Controls.button_z_1->setVisible(false);
+        m_Controls.button_z_2->setVisible(false);
+        return;
+    } else {
+        m_Controls.button_z_1->setVisible(true);
+        m_Controls.button_z_2->setVisible(true);
+    }//_if
+}
+
+void AtrialScarView::SelectLandmarks() {
+
+    if (m_Controls.button_z_1->text() == QString::fromStdString("Select Landmarks")) {
+
+        //Show the plugin
+        QMessageBox::information(NULL, "Attention", "Please select 3 points around the mitral valve!");
+        this->GetSite()->GetPage()->ShowView("org.mitk.views.pointsetinteraction");
+        m_Controls.button_z_1->setText("Display Clipper");
+
+    } else {
+
+        //Check for selection of points
+        QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+        if (nodes.empty()) {
+            QMessageBox::warning(NULL, "Attention", "Please select the pointsets from the Data Manager to clip the mitral valve!");
+            return;
+        }//_if
+
+        //Check selection type
+        mitk::DataNode::Pointer landMarks = nodes.front();
+        mitk::PointSet::Pointer pointSet = dynamic_cast<mitk::PointSet*>(landMarks->GetData());
+        if (!pointSet || pointSet->GetSize() != 3) {
+            QMessageBox::warning(NULL, "Attention", "Please select landmarks with 3 points from the Data Manager to continue!");
+            return;
+        }//_if
+
+        //If the path was chosen incorrectly returns
+        if (!RequestProjectDirectoryFromUser()) return;
+
+        //Reset the button
+        m_Controls.button_z_1->setText("Select Landmarks");
+
+        //Retrieve mean and distance of 3 points
+        double x_c = 0;
+        double y_c = 0;
+        double z_c = 0;
+        for (int i = 0; i < pointSet->GetSize(); i++) {
+            x_c = x_c + pointSet->GetPoint(i).GetElement(0);
+            y_c = y_c + pointSet->GetPoint(i).GetElement(1);
+            z_c = z_c + pointSet->GetPoint(i).GetElement(2);
+        }//_for
+        x_c /= pointSet->GetSize();
+        y_c /= pointSet->GetSize();
+        z_c /= pointSet->GetSize();
+        //double distance[pointSet->GetSize()];
+        double * distance = new double[pointSet->GetSize()];
+        for (int i = 0; i < pointSet->GetSize(); i++) {
+            double x_d = pointSet->GetPoint(i).GetElement(0) - x_c;
+            double y_d = pointSet->GetPoint(i).GetElement(1) - y_c;
+            double z_d = pointSet->GetPoint(i).GetElement(2) - z_c;
+            distance[i] = sqrt(pow(x_d, 2) + pow(y_d, 2) + pow(z_d, 2));
+        }//_for
+        double radius = *std::max_element(distance, distance + pointSet->GetSize());
+
+        delete[] distance;
+        //Create the clipper geometry
+        vtkSmartPointer<vtkSphereSource> sphereSource = vtkSmartPointer<vtkSphereSource>::New();
+        sphereSource->SetCenter(x_c, y_c, z_c);
+        sphereSource->SetRadius(radius);
+        sphereSource->SetPhiResolution(40);
+        sphereSource->SetThetaResolution(40);
+        sphereSource->Update();
+        mitk::Surface::Po
