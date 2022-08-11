@@ -1379,4 +1379,76 @@ void AtrialScarView::ClipMitralValve() {
     //Check to remove the previous mesh node
     mitk::DataStorage::SetOfObjects::ConstPointer sob = this->GetDataStorage()->GetAll();
     for (mitk::DataStorage::SetOfObjects::ConstIterator nodeIt = sob->Begin(); nodeIt != sob->End(); ++nodeIt) {
-        if (nodeIt->Value()->GetName().fi
+        if (nodeIt->Value()->GetName().find("-Mesh") != nodeIt->Value()->GetName().npos)
+            this->GetDataStorage()->Remove(nodeIt->Value());
+        if (nodeIt->Value()->GetName().find("MVClipper") != nodeIt->Value()->GetName().npos)
+            this->GetDataStorage()->Remove(nodeIt->Value());
+    }//_for
+    CemrgCommonUtils::AddToStorage(surface, "MVClipped-Mesh", this->GetDataStorage(), false);
+
+    //Reverse coordination of surface for writing MIRTK style
+    mitk::Surface::Pointer surfCloned = surface->Clone();
+    vtkSmartPointer<vtkPolyData> pd = surfCloned->GetVtkPolyData();
+    for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+        double* point = pd->GetPoint(i);
+        point[0] = -point[0];
+        point[1] = -point[1];
+        pd->GetPoints()->SetPoint(i, point);
+    }//_for
+    mitk::IOUtil::Save(surfCloned, path.toStdString());
+}
+
+void AtrialScarView::ScarMap() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 1) {
+        QMessageBox::warning(NULL, "Attention", "Please select the LGE image from the Data Manager to calculate the scar map!");
+        return;
+    }
+    std::size_t found = nodes.at(0)->GetName().find("LGE");
+    bool check = found != std::string::npos ? false : true;
+    if (check) {
+        QMessageBox::warning(NULL, "Attention", "Please select the LGE image from the Data Manager to calculate the scar map!");
+        return;
+    }
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Check for mesh in the project directory
+    try {
+        QString path = directory + "/segmentation.vtk";
+        mitk::IOUtil::Load<mitk::Surface>(path.toStdString());
+    } catch (...) {
+        QMessageBox::critical(NULL, "Attention", "No mesh was found in the project directory!");
+        return;
+    }//_try
+
+    //Find the selected node
+    mitk::DataNode::Pointer imgNode = nodes.at(0);
+    mitk::BaseData::Pointer data = imgNode->GetData();
+    if (data) {
+
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (image.IsNotNull()) {
+
+            scar = std::unique_ptr<CemrgScar3D>(new CemrgScar3D());
+            if (scar) {
+
+                //Ask for user input to set the parameters
+                QDialog* inputs = new QDialog(0, 0);
+                m_UIScar.setupUi(inputs);
+                connect(m_UIScar.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+                connect(m_UIScar.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+                int dialogCode = inputs->exec();
+
+                //Act on dialog return code
+                if (dialogCode == QDialog::Accepted) {
+
+                    bool ok1, ok2;
+                    int minStep = m_UIScar.lineEdit_1->text().toInt(&ok1);
+                    int maxStep = m_UIScar.lineEdit_2->text().toInt(&ok2);
+                    int methodType = m_UIScar.radioButton_1->isChecked() ? 2 : 1;
+                    QString meType = m_UIScar.radioButton_1->isChecked() ? "Max" : "Mean";
+                    bool voxelBas
