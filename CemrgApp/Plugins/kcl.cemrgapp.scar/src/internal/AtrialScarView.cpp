@@ -1312,4 +1312,71 @@ void AtrialScarView::SelectLandmarks() {
         sphereSource->SetPhiResolution(40);
         sphereSource->SetThetaResolution(40);
         sphereSource->Update();
-        mitk::Surface::Po
+        mitk::Surface::Pointer mvClipper = mitk::Surface::New();
+        mvClipper->SetVtkPolyData(sphereSource->GetOutput());
+
+        //Adjust the data storage
+        mitk::DataStorage::SetOfObjects::ConstPointer sob = this->GetDataStorage()->GetAll();
+        for (mitk::DataStorage::SetOfObjects::ConstIterator nodeIt = sob->Begin(); nodeIt != sob->End(); ++nodeIt)
+            if (nodeIt->Value()->GetName().find("MVClipper") != nodeIt->Value()->GetName().npos)
+                this->GetDataStorage()->Remove(nodeIt->Value());
+        CemrgCommonUtils::AddToStorage(mvClipper, "MVClipper", this->GetDataStorage(), false);
+        sob = this->GetDataStorage()->GetAll();
+        for (mitk::DataStorage::SetOfObjects::ConstIterator nodeIt = sob->Begin(); nodeIt != sob->End(); ++nodeIt) {
+            if (nodeIt->Value()->GetName().find("MVClipper") != nodeIt->Value()->GetName().npos) {
+                nodeIt->Value()->SetProperty("opacity", mitk::FloatProperty::New(0.4));
+                nodeIt->Value()->SetProperty("color", mitk::ColorProperty::New(1.0, 0.0, 0.0));
+            }//_if
+        }//_for
+
+    }//_if
+}
+
+void AtrialScarView::ClipMitralValve() {
+
+    //Check for selection of points
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(NULL, "Attention", "Please select the pointsets from the Data Manager to clip the mitral valve!");
+        this->GetSite()->GetPage()->ResetPerspective();
+        return;
+    }//_if
+
+    //Check selection type
+    mitk::DataNode::Pointer landMarks = nodes.front();
+    mitk::PointSet::Pointer pointSet = dynamic_cast<mitk::PointSet*>(landMarks->GetData());
+    if (!pointSet || pointSet->GetSize() != 3) {
+        QMessageBox::warning(NULL, "Attention", "Please select landmarks with 3 points from the Data Manager to continue!");
+        return;
+    }//_if
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Read in and copy
+    QString path = directory + "/segmentation.vtk";
+    mitk::Surface::Pointer surface = CemrgCommonUtils::LoadVTKMesh(path.toStdString());
+    if (surface->GetVtkPolyData() == NULL) {
+        QMessageBox::critical(NULL, "Attention", "No mesh was found in the project directory!");
+        return;
+    }//_if
+    QString orgP = path.left(path.lastIndexOf(QChar('.'))) + "-Original.vtk";
+    mitk::IOUtil::Save(mitk::IOUtil::Load<mitk::Surface>(path.toStdString()), orgP.toStdString());
+
+    /*
+     * Producibility Test
+     **/
+    QString prodPath = directory + "/";
+    mitk::IOUtil::Save(pointSet, (prodPath + "prodMVCLandmarks.mps").toStdString());
+    /*
+     * End Test
+     **/
+
+    this->BusyCursorOn();
+    std::unique_ptr<CemrgScar3D> scarObj = std::unique_ptr<CemrgScar3D>(new CemrgScar3D());
+    surface = scarObj->ClipMesh3D(surface, pointSet);
+    this->BusyCursorOff();
+
+    //Check to remove the previous mesh node
+    mitk::DataStorage::SetOfObjects::ConstPointer sob = this->GetDataStorage()->GetAll();
+    for (mitk::DataStorage::SetOfObjects::ConstIterator nodeIt = sob->Begin(); nodeIt != sob->End(); ++nodeIt) {
+        if (nodeIt->Value()->GetName().fi
