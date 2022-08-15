@@ -1451,4 +1451,64 @@ void AtrialScarView::ScarMap() {
                     int maxStep = m_UIScar.lineEdit_2->text().toInt(&ok2);
                     int methodType = m_UIScar.radioButton_1->isChecked() ? 2 : 1;
                     QString meType = m_UIScar.radioButton_1->isChecked() ? "Max" : "Mean";
-                    bool voxelBas
+                    bool voxelBasedProjection = m_UIScar.checkBox->isChecked();
+
+                    //Set default values
+                    if (!ok1 || !ok2)
+                        QMessageBox::warning(NULL, "Attention", "Reverting to default parameters!");
+                    if (!ok1) minStep = -1;
+                    if (!ok2) maxStep = 3;
+                    //_if
+
+                    /*
+                     * Producibility Test
+                     **/
+                    QString prodPath = directory + "/";
+                    ofstream prodFile1;
+                    prodFile1.open((prodPath + "prodScarMapInputs.txt").toStdString());
+                    prodFile1 << minStep << "\n";
+                    prodFile1 << maxStep << "\n";
+                    prodFile1 << meType.toStdString() << "\n";
+                    prodFile1.close();
+                    /*
+                     * End Test
+                     **/
+
+                    this->BusyCursorOn();
+                    mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+
+                    scar->SetMinStep(minStep);
+                    scar->SetMaxStep(maxStep);
+                    scar->SetMethodType(methodType);
+                    scar->SetVoxelBasedProjection(voxelBasedProjection);
+                    mitk::Image::Pointer scarSegImg;
+                    try {
+                        QString path = directory + "/" + fileName;
+                        scarSegImg = mitk::IOUtil::Load<mitk::Image>(path.toStdString());
+                    } catch (...) {
+                        QMessageBox::critical(NULL, "Attention", "The loaded or created segmentation was not found!");
+                        mitk::ProgressBar::GetInstance()->Progress();
+                        this->BusyCursorOff();
+                        return;
+                    }//_try
+
+                    //Resample to fit LGE
+                    typedef itk::Image<short, 3> ImageType;
+                    itk::ResampleImageFilter<ImageType, ImageType>::Pointer resampleFilter;
+                    ImageType::Pointer scarSegITK = ImageType::New();
+                    CastToItkImage(scarSegImg, scarSegITK);
+                    ImageType::Pointer lgeITK = ImageType::New();
+                    CastToItkImage(image, lgeITK);
+                    resampleFilter = itk::ResampleImageFilter<ImageType, ImageType >::New();
+                    resampleFilter->SetInput(scarSegITK);
+                    resampleFilter->SetReferenceImage(lgeITK);
+                    resampleFilter->SetUseReferenceImage(true);
+                    resampleFilter->SetInterpolator(itk::NearestNeighborInterpolateImageFunction<ImageType>::New());
+                    resampleFilter->SetDefaultPixelValue(0);
+                    resampleFilter->UpdateLargestPossibleRegion();
+                    scarSegImg = mitk::ImportItkImage(resampleFilter->GetOutput());
+
+                    //Update datamanger
+                    std::string nodeSegImgName = fileName.left(fileName.lastIndexOf(QChar('.'))).toStdString();
+                    mitk::DataStorage::SetOfObjects::ConstPointer sob = this->GetDataStorage()->GetAll();
+                    for (mitk::D
