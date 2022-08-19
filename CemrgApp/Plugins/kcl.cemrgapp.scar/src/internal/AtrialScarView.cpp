@@ -1563,3 +1563,77 @@ void AtrialScarView::ScarMap() {
         } else
             return;
     } else
+        return;
+}
+
+void AtrialScarView::ScarDebug() {
+
+    MITK_INFO << "Loading: " + debugSCARname.toStdString();
+
+    if (debugSCARname.isEmpty()) {
+        MITK_INFO << "File: " + debugSCARname.toStdString() + " NOT FOUND";
+        return;
+    }
+    mitk::IOUtil::Load(debugSCARname.toStdString(), *this->GetDataStorage());
+    mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+    m_Controls.button_deb->setVisible(false);
+    //Restore image name
+    //char sep = "/";
+    //fileName = path.mid(path.lastIndexOf(sep) + 1);
+}
+
+void AtrialScarView::Threshold() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 1) {
+        QMessageBox::warning(NULL, "Attention", "Please select the LGE image from the Data Manager to quantify the scar!");
+        return;
+    }
+    std::size_t found = nodes.at(0)->GetName().find("LGE");
+    bool check = found != std::string::npos ? false : true;
+    if (check) {
+        QMessageBox::warning(NULL, "Attention", "Please select the LGE image from the Data Manager to quantify the scar!");
+        return;
+    }
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Find the selected node
+    double mean = 0.0, stdv = 0.0;
+    mitk::DataNode::Pointer imgNode = nodes.at(0);
+    mitk::BaseData::Pointer data = imgNode->GetData();
+    if (data) {
+
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (image.IsNotNull()) {
+
+            //Convert images to right type
+            mitk::Image::Pointer roi;
+            mitk::Image::Pointer lgeImage = mitk::Image::New();
+            itk::Image<float, 3>::Pointer itkImage = itk::Image<float, 3>::New();
+            mitk::CastToItkImage(image, itkImage);
+            mitk::CastToMitkImage(itkImage, lgeImage);
+            try {
+                QString path = directory + "/" + fileName;
+                roi = mitk::IOUtil::Load<mitk::Image>(path.toStdString());
+            } catch (...) {
+                QMessageBox::critical(NULL, "Attention", "The loaded or created segmentation was not found!");
+                return;
+            }//_try
+            itk::Image<float, 3>::Pointer roiItkImage = itk::Image<float, 3>::New();
+            mitk::CastToItkImage(roi, roiItkImage);
+            if (scar) {
+
+                //Erosion of bloodpool
+                typedef itk::Image<float, 3> ImageType;
+                typedef itk::BinaryCrossStructuringElement<ImageType::PixelType, 3> CrossType;
+                typedef itk::GrayscaleErodeImageFilter<ImageType, ImageType, CrossType> ErosionFilterType;
+                bool ok;
+                int vxls = QInputDialog::getInt(NULL, tr("Bloodpool Erosion"), tr("Voxels:"), 3, 1, 20, 1, &ok);
+                if (!ok) {
+                    QMessageBox::warning(NULL, "Attention", "Enter a correct value!");
+                    return;
+                }//_if
+                CrossType bina
