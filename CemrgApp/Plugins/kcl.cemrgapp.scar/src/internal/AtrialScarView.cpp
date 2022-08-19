@@ -1511,4 +1511,55 @@ void AtrialScarView::ScarMap() {
                     //Update datamanger
                     std::string nodeSegImgName = fileName.left(fileName.lastIndexOf(QChar('.'))).toStdString();
                     mitk::DataStorage::SetOfObjects::ConstPointer sob = this->GetDataStorage()->GetAll();
-                    for (mitk::D
+                    for (mitk::DataStorage::SetOfObjects::ConstIterator nodeIt = sob->Begin(); nodeIt != sob->End(); ++nodeIt)
+                        if (nodeIt->Value()->GetName().find(nodeSegImgName) != nodeIt->Value()->GetName().npos)
+                            this->GetDataStorage()->Remove(nodeIt->Value());
+                    QString savePath = directory + "/" + fileName;
+                    mitk::IOUtil::Save(scarSegImg, savePath.toStdString());
+
+                    //Projection
+                    scar->SetScarSegImage(scarSegImg);
+                    mitk::Surface::Pointer shell = scar->Scar3D(directory.toStdString(), image);
+                    mitk::DataNode::Pointer node = CemrgCommonUtils::AddToStorage(shell, (meType + "Scar3D").toStdString(), this->GetDataStorage());
+
+                    MITK_INFO << "Saving debug scar map labels.";
+                    scar->SaveScarDebugImage(meType + "_debugSCAR.nii", directory);
+
+                    //Check to remove the previous mesh node
+                    sob = this->GetDataStorage()->GetAll();
+                    for (mitk::DataStorage::SetOfObjects::ConstIterator nodeIt = sob->Begin(); nodeIt != sob->End(); ++nodeIt)
+                        if (nodeIt->Value()->GetName().find("-Mesh") != nodeIt->Value()->GetName().npos)
+                            this->GetDataStorage()->Remove(nodeIt->Value());
+
+                    //LUT setup
+                    mitk::LookupTable::Pointer scarLut = mitk::LookupTable::New();
+                    vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
+                    lut->SetTableRange(0, scar->GetMaxScalar());
+                    lut->SetHueRange(0.33, 0.0);
+                    lut->Build();
+                    lut->SetTableValue(0, 0.0, 0.0, 0.0, 1.0);
+                    scarLut->SetVtkLookupTable(lut);
+                    node->SetProperty("LookupTable", mitk::LookupTableProperty::New(scarLut));
+                    node->SetProperty("scalar visibility", mitk::BoolProperty::New(true));
+                    node->SetProperty("scalar mode", mitk::VtkScalarModeProperty::New(2));
+                    node->SetFloatProperty("ScalarsRangeMinimum", 0);
+                    node->SetFloatProperty("ScalarsRangeMaximum", scar->GetMaxScalar());
+
+                    //Save the vtk mesh
+                    QString name(imgNode->GetName().c_str());
+                    name = name.right(name.length() - name.lastIndexOf("-") - 1);
+                    QString path = directory + "/" + name + "-" + meType + "Scar.vtk";
+                    mitk::IOUtil::Save(shell, path.toStdString());
+
+                    mitk::ProgressBar::GetInstance()->Progress();
+                    this->BusyCursorOff();
+                    inputs->deleteLater();
+
+                } else if (dialogCode == QDialog::Rejected) {
+                    inputs->close();
+                    inputs->deleteLater();
+                }//_if
+            }//_scar
+        } else
+            return;
+    } else
