@@ -1722,4 +1722,80 @@ void AtrialScarView::Sphericity() {
 
     //Read in the mesh
     QString path = directory + "/segmentation.vtk";
-    mitk::Surface::Pointer surface = CemrgCommonUtils::LoadVTKMesh(
+    mitk::Surface::Pointer surface = CemrgCommonUtils::LoadVTKMesh(path.toStdString());
+
+    double result = 0;
+    std::unique_ptr<CemrgMeasure> Sphericity = std::unique_ptr<CemrgMeasure>(new CemrgMeasure());
+    if (surface->GetVtkPolyData() != NULL)
+        result = Sphericity->GetSphericity(surface->GetVtkPolyData());
+    else {
+        QMessageBox::warning(NULL, "Attention", "No mesh was found in the project directory!");
+        return;
+    }//_if
+
+    QString message = "The sphericity is " + QString::number(result) + "%.";
+    QMessageBox::information(NULL, "Sphericity", message);
+}
+
+void AtrialScarView::ResetMain() {
+
+    Reset(true);
+    m_Controls.button_3->setVisible(true);
+    m_Controls.button_4->setVisible(false);
+    m_Controls.button_5->setVisible(false);
+    m_Controls.button_6->setVisible(false);
+    m_Controls.button_7->setVisible(false);
+    m_Controls.button_x->setVisible(false);
+    m_Controls.button_y->setVisible(false);
+    m_Controls.button_z->setVisible(false);
+    m_Controls.button_s->setVisible(false);
+    m_Controls.button_2_1->setVisible(false);
+    m_Controls.button_x_1->setVisible(false);
+    m_Controls.button_x_2->setVisible(false);
+    m_Controls.button_z_1->setVisible(false);
+    m_Controls.button_z_2->setVisible(false);
+    m_Controls.button_deb->setVisible(false);
+}
+
+void AtrialScarView::Reset(bool allItems) {
+
+    try {
+
+        ctkPluginContext* context = mitk::kcl_cemrgapp_scar_Activator::getContext();
+        mitk::IDataStorageService* dss = 0;
+        ctkServiceReference dsRef = context->getServiceReference<mitk::IDataStorageService>();
+
+        if (dsRef)
+            dss = context->getService<mitk::IDataStorageService>(dsRef);
+
+        if (!dss) {
+            MITK_WARN << "IDataStorageService service not available. Unable to close project.";
+            context->ungetService(dsRef);
+            return;
+        }
+
+        mitk::IDataStorageReference::Pointer dataStorageRef = dss->GetActiveDataStorage();
+        if (dataStorageRef.IsNull()) {
+            //No active data storage set (i.e. not editor with a DataStorageEditorInput is active).
+            dataStorageRef = dss->GetDefaultDataStorage();
+        }
+
+        mitk::DataStorage::Pointer dataStorage = dataStorageRef->GetDataStorage();
+        if (dataStorage.IsNull()) {
+            MITK_WARN << "No data storage available. Cannot close project.";
+            return;
+        }
+
+        //Check if we got the default datastorage and if there is anything else then helper object in the storage
+        if (dataStorageRef->IsDefault() && dataStorage->GetSubset(
+            mitk::NodePredicateNot::New(
+                mitk::NodePredicateProperty::New("helper object", mitk::BoolProperty::New(true))))->empty())
+            return;
+
+        //Remove everything or keep images
+        mitk::DataStorage::SetOfObjects::ConstPointer nodesToRemove = dataStorage->GetAll();
+        if (allItems) {
+            dataStorage->Remove(nodesToRemove);
+        } else {
+            mitk::DataStorage::SetOfObjects::ConstIterator iter = nodesToRemove->Begin();
+            mitk::DataStorage::SetOfObjects::ConstIterator it
