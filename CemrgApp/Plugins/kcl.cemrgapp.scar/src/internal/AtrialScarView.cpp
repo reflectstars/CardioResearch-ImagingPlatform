@@ -1636,4 +1636,90 @@ void AtrialScarView::Threshold() {
                     QMessageBox::warning(NULL, "Attention", "Enter a correct value!");
                     return;
                 }//_if
-                CrossType bina
+                CrossType binaryCross;
+                binaryCross.SetRadius(vxls);
+                binaryCross.CreateStructuringElement();
+                ErosionFilterType::Pointer erosionFilter = ErosionFilterType::New();
+                erosionFilter->SetInput(roiItkImage);
+                erosionFilter->SetKernel(binaryCross);
+                erosionFilter->UpdateLargestPossibleRegion();
+                mitk::Image::Pointer roiImage = mitk::ImportItkImage(erosionFilter->GetOutput())->Clone();
+                CemrgCommonUtils::AddToStorage(roiImage, "Eroded ROI", this->GetDataStorage());
+
+                //Calculate mean, std of ROI
+                bool success = scar->CalculateMeanStd(lgeImage, roiImage, mean, stdv);
+                if (!success)
+                    return;
+
+            } else {
+                QMessageBox::warning(NULL, "Attention", "The scar map from the previous step has not been generated!");
+                return;
+            }//_if_scar
+        }//_image
+    }//_data
+
+    //Ask for user input to set the parameters
+    QDialog* inputs = new QDialog(0, 0);
+    m_UISQuant.setupUi(inputs);
+    connect(m_UISQuant.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+    connect(m_UISQuant.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+    int dialogCode = inputs->exec();
+
+    //Act on dialog return code
+    if (dialogCode == QDialog::Accepted) {
+
+        bool ok;
+        double value = m_UISQuant.lineEdit->text().toDouble(&ok);
+        int methodType = m_UISQuant.radioButton_1->isChecked() ? 1 : 2;
+
+        //Set default values
+        if (!ok) {
+            QMessageBox::warning(NULL, "Attention", "Please enter a valid value!");
+            return;
+        }//_ok
+
+        this->BusyCursorOn();
+        mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+
+        double percentage = 0;
+        double thresh = (methodType == 1) ? mean * value : mean + value * stdv;
+
+        /*
+         * Producibility Test
+         **/
+        QString prodPath = directory + "/";
+        ofstream prodFile1;
+        prodFile1.open((prodPath + "prodThresholds.txt").toStdString());
+        prodFile1 << value << "\n";
+        prodFile1 << methodType << "\n";
+        prodFile1 << mean << "\n";
+        prodFile1 << stdv << "\n";
+        prodFile1 << thresh << "\n";
+        prodFile1.close();
+        /*
+         * End Test
+         **/
+
+        if (scar) percentage = scar->Thresholding(thresh);
+        std::ostringstream os;
+        os << std::fixed << std::setprecision(2) << percentage;
+        QString message = "The percentage scar is " + QString::fromStdString(os.str()) + "% of total segmented volume.";
+        QMessageBox::information(NULL, "Scar Quantification", message);
+
+        mitk::ProgressBar::GetInstance()->Progress();
+        this->BusyCursorOff();
+        inputs->deleteLater();
+
+    } else if (dialogCode == QDialog::Rejected) {
+        inputs->close();
+        inputs->deleteLater();
+    }//_if
+}
+
+void AtrialScarView::Sphericity() {
+
+    if (!RequestProjectDirectoryFromUser()) return; // if the path was chosen incorrectly -> returns.
+
+    //Read in the mesh
+    QString path = directory + "/segmentation.vtk";
+    mitk::Surface::Pointer surface = CemrgCommonUtils::LoadVTKMesh(
