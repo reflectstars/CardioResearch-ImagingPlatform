@@ -1798,4 +1798,63 @@ void AtrialScarView::Reset(bool allItems) {
             dataStorage->Remove(nodesToRemove);
         } else {
             mitk::DataStorage::SetOfObjects::ConstIterator iter = nodesToRemove->Begin();
-            mitk::DataStorage::SetOfObjects::ConstIterator it
+            mitk::DataStorage::SetOfObjects::ConstIterator iterEnd = nodesToRemove->End();
+            for (; iter != iterEnd; ++iter) {
+                QString name = QString::fromStdString(iter->Value()->GetName());
+                if (name.startsWith("dcm-"))
+                    continue;
+                dataStorage->Remove(iter->Value());
+            }//_for
+        }//_if
+
+        //Remove the datastorage from the data storage service
+        dss->RemoveDataStorageReference(dataStorageRef);
+
+        //Close all editors with this data storage as input
+        mitk::DataStorageEditorInput::Pointer dsInput(new mitk::DataStorageEditorInput(dataStorageRef));
+        QList<berry::IEditorReference::Pointer> dsEditors =
+            this->GetSite()->GetPage()->FindEditors(dsInput, QString(), berry::IWorkbenchPage::MATCH_INPUT);
+
+        if (!dsEditors.empty()) {
+            QList<berry::IEditorReference::Pointer> editorsToClose = dsEditors;
+            this->GetSite()->GetPage()->CloseEditors(editorsToClose, false);
+        }
+
+    } catch (std::exception& e) {
+
+        MITK_ERROR << "Exception caught during closing project: " << e.what();
+        QMessageBox::warning(NULL, "Error", QString("An error occurred during Close Project: %1").arg(e.what()));
+    }//_try
+
+    //Clear project directory
+    fileName = ".nii";
+    directory.clear();
+    m_Controls.button_z_1->setText("Select Landmarks");
+    this->GetSite()->GetPage()->ResetPerspective();
+}
+
+bool AtrialScarView::RequestProjectDirectoryFromUser() {
+
+    bool succesfulAssignment = true;
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+
+        MITK_INFO << "Directory is empty. Requesting user for directory.";
+        directory = QFileDialog::getExistingDirectory(
+            NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontUseNativeDialog);
+        MITK_INFO << ("Directory selected:" + directory).toStdString();
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            MITK_WARN << "Please select a project directory with no spaces in the path!";
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            succesfulAssignment = false;
+        }//_if
+
+    } else {
+        MITK_INFO << ("Project directory already set: " + directory).toStdString();
+    }//_if
+
+    return succesfulAssignment;
+}
