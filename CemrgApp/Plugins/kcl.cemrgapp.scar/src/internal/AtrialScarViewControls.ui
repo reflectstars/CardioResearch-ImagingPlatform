@@ -16,4 +16,117 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QLabel" name="titleLabel">
-     <property 
+     <property name="styleSheet">
+      <string notr="true">QLabel { color: rgb(255, 0, 0) }</string>
+     </property>
+     <property name="text">
+      <string>Scar Quantification Pipeline</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="button_1">
+     <property name="toolTip">
+      <string>Do image processing</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">text-align: left;</string>
+     </property>
+     <property name="text">
+      <string>   Step1: Load DICOM</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="button_2">
+     <property name="toolTip">
+      <string>Do image processing</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">text-align: left;</string>
+     </property>
+     <property name="text">
+      <string>   Step2: Process Images</string>
+     </property>
+    </widget>
+   </item>
+   <item alignment="Qt::AlignHCenter">
+    <widget class="QPushButton" name="button_2_1">
+     <property name="minimumSize">
+      <size>
+       <width>140</width>
+       <height>0</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>140</width>
+       <height>16777215</height>
+      </size>
+     </property>
+     <property name="text">
+      <string>Convert to Nifti</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="button_3">
+     <property name="styleSheet">
+      <string notr="true">text-align: left;</string>
+     </property>
+     <property name="text">
+      <string>   Step3: Scar Analysis</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="button_4">
+     <property name="toolTip">
+      <string>Do image processing</string>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">text-align: left;</string>
+     </property>
+     <property name="text">
+      <string>   Step4: Segment Images</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="button_x">
+     <property name="cursor">
+      <cursorShape>ArrowCursor</cursorShape>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">text-align: left; color: rgb(132, 174, 235);</string>
+     </property>
+     <property name="text">
+      <string>   StepX: Registration</string>
+     </property>
+    </widget>
+   </item>
+   <item alignment="Qt::AlignHCenter">
+    <widget class="QPushButton" name="button_x_1">
+     <property name="minimumSize">
+      <size>
+       <width>140</width>
+       <height>0</height>
+      </size>
+     </property>
+     <property name="maximumSize">
+      <size>
+       <width>140</width>
+       <height>16777215</height>
+      </size>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">color: rgb(132, 174, 235);</string>
+     </property>
+     <property name="text">
+      <string>Register</string>
+     </property>
+    </widget>
+   <
