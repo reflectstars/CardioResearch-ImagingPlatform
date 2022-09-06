@@ -72,4 +72,36 @@ public:
     void insertion_sort(int array[], int l);
 
 
-protected s
+protected slots:
+
+    /// \brief Called when the user clicks the GUI button
+    void LoadDICOM();
+    void ProcessIMGS();
+    void ConvertNII();
+    void ResampIMGS();
+    void SegmentIMGS();
+    void SaveSEG();
+    void ScarSeg();
+    void ScarSeg_FWHM();
+    void ScarSeg_SD();
+    void ScarSeg_4SD();
+    void ScarSeg_6SD();
+    void ScarSeg_CustomisedSD();
+    void ScarSeg_save();
+
+protected:
+
+    virtual void CreateQtPartControl(QWidget *parent) override;
+    virtual void SetFocus() override;
+    /// \brief called by QmitkFunctionality when DataManager's selection has changed
+    virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer source, const QList<mitk::DataNode::Pointer>& nodes) override;
+    Ui::YZSegViewControls m_Controls;
+
+private:
+
+    QString fileName;
+    QString directory;
+    std::unique_ptr<CemrgScar3D> scar;
+};
+
+#endif // YZSegView_h
