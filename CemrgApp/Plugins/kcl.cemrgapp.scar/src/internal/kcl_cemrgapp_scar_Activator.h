@@ -26,30 +26,30 @@ PURPOSE.  See the above copyright notices for more information.
  *
 =========================================================================*/
 
-#include "kcl_cemrgapp_scar_Activator.h"
-#include "AtrialScarView.h"
-#include "AtrialScarClipperView.h"
-#include "YZSegView.h"
-#include "ScarCalculationsView.h"
+#ifndef kcl_cemrgapp_scar_Activator_h
+#define kcl_cemrgapp_scar_Activator_h
+
+#include <ctkPluginActivator.h>
 
 namespace mitk {
 
-    ctkPluginContext* kcl_cemrgapp_scar_Activator::pluginContext = nullptr;
+    class kcl_cemrgapp_scar_Activator: public QObject, public ctkPluginActivator {
 
-    void kcl_cemrgapp_scar_Activator::start(ctkPluginContext *context) {
-        BERRY_REGISTER_EXTENSION_CLASS(AtrialScarView, context);
-        BERRY_REGISTER_EXTENSION_CLASS(AtrialScarClipperView, context);
-        BERRY_REGISTER_EXTENSION_CLASS(YZSegView, context);
-        BERRY_REGISTER_EXTENSION_CLASS(ScarCalculationsView, context);
-        pluginContext = context;
-    }
+        Q_OBJECT
+        Q_PLUGIN_METADATA(IID "kcl_cemrgapp_scar")
+        Q_INTERFACES(ctkPluginActivator)
 
-    void kcl_cemrgapp_scar_Activator::stop(ctkPluginContext *context) {
-        Q_UNUSED(context)
-        pluginContext = nullptr;
-    }
+    public:
 
-    ctkPluginContext* kcl_cemrgapp_scar_Activator::getContext() {
-        return pluginContext;
-    }
+        void start(ctkPluginContext *context);
+        void stop(ctkPluginContext *context);
+        static ctkPluginContext* getContext();
+
+    private:
+
+        static ctkPluginContext* pluginContext;
+
+    }; // kcl_cemrgapp_scar_Activator
 }
+
+#endif // kcl_cemrgapp_scar_Activator_h
