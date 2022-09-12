@@ -12,4 +12,7 @@
     <view id="org.mitk.views.wathcaclipperview"
           name="Cemrg Morphological Measurements Clippers"
           class="WallThicknessCalculationsClipperView"
-          icon="resourc
+          icon="resources/icon.xpm" />
+  </extension>
+
+</plugin>
