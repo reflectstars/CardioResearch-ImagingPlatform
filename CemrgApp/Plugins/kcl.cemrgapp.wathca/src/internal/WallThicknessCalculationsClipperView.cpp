@@ -191,4 +191,63 @@ void WallThicknessCalculationsClipperView::iniPreSurf() {
             //Ask for user input to set the parameters
             QDialog* inputs = new QDialog(0, 0);
             m_UIMeshing.setupUi(inputs);
-        
+            connect(m_UIMeshing.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+            connect(m_UIMeshing.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+            int dialogCode = inputs->exec();
+
+            //Act on dialog return code
+            if (dialogCode == QDialog::Accepted) {
+
+                bool ok1, ok2, ok3, ok4;
+                float th = m_UIMeshing.lineEdit_1->text().toFloat(&ok1);
+                float bl = m_UIMeshing.lineEdit_2->text().toFloat(&ok2);
+                int smth = m_UIMeshing.lineEdit_3->text().toInt(&ok3);
+                float ds = m_UIMeshing.lineEdit_4->text().toFloat(&ok4);
+
+                //Set default values
+                if (!ok1 || !ok2 || !ok3 || !ok4)
+                    QMessageBox::warning(NULL, "Attention", "Reverting to default parameters!");
+                if (!ok1) th = 0.5;
+                if (!ok2) bl = 0.8;
+                if (!ok3) smth = 3;
+                if (!ok4) ds = 0.5;
+                //_if
+
+                //Mesh creation
+                this->BusyCursorOn();
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(2);
+                auto filter = mitk::ManualSegmentationToSurfaceFilter::New();
+                filter->SetInput(image);
+                filter->SetThreshold(th);
+                filter->SetUseGaussianImageSmooth(true);
+                filter->SetSmooth(true);
+                filter->SetMedianFilter3D(true);
+                filter->InterpolationOn();
+                filter->SetGaussianStandardDeviation(bl);
+                filter->SetMedianKernelSize(smth, smth, smth);
+                filter->SetDecimate(mitk::ImageToSurfaceFilter::QuadricDecimation);
+                filter->SetTargetReduction(ds);
+                filter->UpdateLargestPossibleRegion();
+                mitk::ProgressBar::GetInstance()->Progress();
+                mitk::Surface::Pointer shell = filter->GetOutput();
+                vtkSmartPointer<vtkPolyData> pd = shell->GetVtkPolyData();
+                pd->SetVerts(nullptr);
+                pd->SetLines(nullptr);
+                for (int i = 0; i < pd->GetNumberOfPoints(); i++) {
+                    double* point = pd->GetPoint(i);
+                    point[0] = -point[0];
+                    point[1] = -point[1];
+                    pd->GetPoints()->SetPoint(i, point);
+                }//_for
+                vtkSmartPointer<vtkPolyDataConnectivityFilter> connectivityFilter = vtkSmartPointer<vtkPolyDataConnectivityFilter>::New();
+                connectivityFilter->SetInputData(pd);
+                connectivityFilter->ColorRegionsOff();
+                connectivityFilter->SetExtractionModeToLargestRegion();
+                connectivityFilter->Update();
+                vtkSmartPointer<vtkPolyDataNormals> normals = vtkSmartPointer<vtkPolyDataNormals>::New();
+                normals->AutoOrientNormalsOn();
+                normals->FlipNormalsOff();
+                normals->SetInputConnection(connectivityFilter->GetOutputPort());
+                normals->Update();
+                shell->SetVtkPolyData(normals->GetOutput());
+                surfac
