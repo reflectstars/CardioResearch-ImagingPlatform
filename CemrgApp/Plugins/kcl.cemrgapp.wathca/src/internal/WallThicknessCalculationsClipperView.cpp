@@ -119,4 +119,76 @@ void WallThicknessCalculationsClipperView::CreateQtPartControl(QWidget *parent) 
     m_Controls.widget_1->SetRenderWindow(renderWindow);
     m_Controls.widget_1->GetRenderWindow()->AddRenderer(renderer);
 
-    //Setup 
+    //Setup keyboard interactor
+    callBack = vtkSmartPointer<vtkCallbackCommand>::New();
+    callBack->SetCallback(KeyCallBackFunc);
+    callBack->SetClientData(this);
+    interactor = m_Controls.widget_1->GetRenderWindow()->GetInteractor();
+    interactor->SetInteractorStyle(vtkSmartPointer<vtkInteractorStyleTrackballCamera>::New());
+    interactor->GetInteractorStyle()->KeyPressActivationOff();
+    interactor->GetInteractorStyle()->AddObserver(vtkCommand::KeyPressEvent, callBack);
+
+    //Initialisation
+    iniPreSurf();
+    if (surface.IsNotNull()) {
+        pickedSeedIds = vtkSmartPointer<vtkIdList>::New();
+        pickedSeedIds->Initialize();
+        pickedLineSeeds = vtkSmartPointer<vtkPolyData>::New();
+        pickedLineSeeds->Initialize();
+        pickedLineSeeds->SetPoints(vtkSmartPointer<vtkPoints>::New());
+        pickedCutterSeeds = vtkSmartPointer<vtkPolyData>::New();
+        pickedCutterSeeds->Initialize();
+        pickedCutterSeeds->SetPoints(vtkSmartPointer<vtkPoints>::New());
+        clipper = std::unique_ptr<CemrgAtriaClipper>(new CemrgAtriaClipper(directory, surface));
+        Visualiser();
+    }
+    m_Controls.slider->setEnabled(false);
+    m_Controls.spinBox->setEnabled(false);
+    m_Controls.comboBox->setEnabled(false);
+}
+
+void WallThicknessCalculationsClipperView::SetFocus() {
+    m_Controls.button_1->setFocus();
+}
+
+void WallThicknessCalculationsClipperView::OnSelectionChanged(berry::IWorkbenchPart::Pointer /*src*/, const QList<mitk::DataNode::Pointer>& /*nodes*/) {
+}
+
+WallThicknessCalculationsClipperView::~WallThicknessCalculationsClipperView() {
+    inputs->deleteLater();
+}
+
+void WallThicknessCalculationsClipperView::SetDirectoryFile(const QString directory, const QString fileName) {
+    WallThicknessCalculationsClipperView::fileName = fileName;
+    WallThicknessCalculationsClipperView::directory = directory;
+}
+
+void WallThicknessCalculationsClipperView::iniPreSurf() {
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 1) {
+        QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation to clip!");
+        this->GetSite()->GetPage()->ResetPerspective();
+        return;
+    }
+
+    //Find the selected node
+    QString path;
+    mitk::DataNode::Pointer segNode = nodes.at(0);
+    mitk::BaseData::Pointer data = segNode->GetData();
+    if (data) {
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (image) {
+
+            //Check seg node name
+            if (segNode->GetName().compare(fileName.left(fileName.lastIndexOf(QChar('.'))).toStdString()) != 0) {
+                QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+                this->GetSite()->GetPage()->ResetPerspective();
+                return;
+            }//_if
+
+            //Ask for user input to set the parameters
+            QDialog* inputs = new QDialog(0, 0);
+            m_UIMeshing.setupUi(inputs);
+        
