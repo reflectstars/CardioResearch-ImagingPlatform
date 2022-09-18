@@ -250,4 +250,81 @@ void WallThicknessCalculationsClipperView::iniPreSurf() {
                 normals->SetInputConnection(connectivityFilter->GetOutputPort());
                 normals->Update();
                 shell->SetVtkPolyData(normals->GetOutput());
-                surfac
+                surface = shell;
+                mitk::ProgressBar::GetInstance()->Progress();
+                this->BusyCursorOff();
+
+                //Tidy up data
+                inputs->deleteLater();
+
+            } else if (dialogCode == QDialog::Rejected) {
+                inputs->close();
+                inputs->deleteLater();
+                this->GetSite()->GetPage()->ResetPerspective();
+                return;
+            }//_if
+
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+            this->GetSite()->GetPage()->ResetPerspective();
+            return;
+        }//_image
+
+    } else {
+        this->GetSite()->GetPage()->ResetPerspective();
+        return;
+    }//_if
+}
+
+void WallThicknessCalculationsClipperView::CtrLines() {
+
+    if (clipper->GetCentreLines().size() == 0 && pickedSeedLabels.size() == 0) {
+
+        QMessageBox::warning(NULL, "Attention", "Please maske sure you have selected seeds!");
+        return;
+
+    } else {
+
+        //Retrieve centrelines and labels
+        if (clipper->GetCentreLines().size() != 0)
+            QMessageBox::information(NULL, "Attention", "You are using precomputed centrelines!");
+
+        this->BusyCursorOn();
+        for (unsigned int i = 0; i < clipper->GetCentreLines().size(); i++) {
+            if (i == 0) pickedSeedLabels.clear();
+            vtkSmartPointer<vtkPolyData> pd = clipper->GetCentreLines().at(i)->GetOutput();
+            vtkSmartPointer<vtkIntArray> lb = vtkIntArray::SafeDownCast(pd->GetFieldData()->GetAbstractArray("PickedSeedLabels"));
+            pickedSeedLabels.push_back(lb->GetValue(0));
+        }//_for
+        bool successful = clipper->ComputeCtrLines(pickedSeedLabels, pickedSeedIds, m_Controls.checkBox->isChecked());
+        this->BusyCursorOff();
+
+        //Check for failure
+        if (!successful) {
+            QMessageBox::critical(NULL, "Attention", "Computation of Centrelines Failed!");
+            return;
+        }//_if
+    }//_if
+
+    //Set surface opacity
+    renderer->RemoveAllViewProps();
+    vtkSmartPointer<vtkPolyDataMapper> surfMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    surfMapper->SetInputData(surface->GetVtkPolyData());
+    surfMapper->ScalarVisibilityOff();
+    surfActor->SetMapper(surfMapper);
+    surfActor->GetProperty()->SetOpacity(0.5);
+    renderer->AddActor(surfActor);
+
+    //Setup shortcut keys
+    std::string sk;
+    vtkSmartPointer<vtkTextActor> txtActor = vtkSmartPointer<vtkTextActor>::New();
+    sk = "A: revert to automatic\nO: change opacity\nArrows: move planes\nSpace: add clip point\nDelete: remove clip point";
+    txtActor->SetInput(sk.c_str());
+    txtActor->GetTextProperty()->SetFontSize(14);
+    txtActor->GetTextProperty()->SetColor(1.0, 1.0, 1.0);
+    renderer->AddActor2D(txtActor);
+
+    //Create a mapper and actor for centre lines
+    std::vector<vtkSmartPointer<vtkvmtkPolyDataCenterlines>> ctrLines = clipper->GetCentreLines();
+    for (unsigned int i = 0; i < ctrLines.size(); i++) {
+        vtkSmartPointer<vtkPolyDataMapper> linesMapper =
