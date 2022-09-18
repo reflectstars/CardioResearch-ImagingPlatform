@@ -327,4 +327,75 @@ void WallThicknessCalculationsClipperView::CtrLines() {
     //Create a mapper and actor for centre lines
     std::vector<vtkSmartPointer<vtkvmtkPolyDataCenterlines>> ctrLines = clipper->GetCentreLines();
     for (unsigned int i = 0; i < ctrLines.size(); i++) {
-        vtkSmartPointer<vtkPolyDataMapper> linesMapper =
+        vtkSmartPointer<vtkPolyDataMapper> linesMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+        linesMapper->SetInputData(ctrLines.at(i)->GetOutput());
+        linesMapper->ScalarVisibilityOff();
+        vtkSmartPointer<vtkActor> linesActor = vtkSmartPointer<vtkActor>::New();
+        linesActor->SetMapper(linesMapper);
+        linesActor->GetProperty()->SetOpacity(1.0);
+        linesActor->GetProperty()->SetColor(1, 0, 0);
+        renderer->AddActor(linesActor);
+    }//_for
+    m_Controls.widget_1->GetRenderWindow()->Render();
+
+    //Adjust controllers
+    m_Controls.button_1->setEnabled(false);
+    m_Controls.checkBox->setEnabled(false);
+}
+
+void WallThicknessCalculationsClipperView::CtrPlanes() {
+
+    if (clipper->GetCentreLines().size() == 0 || pickedSeedLabels.size() == 0) {
+
+        QMessageBox::warning(NULL, "Attention", "Please maske sure you have computed centre lines!");
+        return;
+
+    } else {
+
+        this->BusyCursorOn();
+        bool successful = clipper->ComputeCtrLinesClippers(pickedSeedLabels);
+        this->BusyCursorOff();
+
+        //Check for failure
+        if (!successful) {
+            QMessageBox::critical(NULL, "Attention", "Computation of Clipper Planes Failed!");
+            return;
+        }//_if
+    }//_if
+
+    std::vector<vtkSmartPointer<vtkRegularPolygonSource>> ctrPlanes = clipper->GetCentreLinePolyPlanes();
+    std::vector<vtkSmartPointer<vtkvmtkPolyDataCenterlines>> ctrLines = clipper->GetCentreLines();
+    vtkSmartPointer<vtkRegularPolygonSource> ctrPlane = ctrPlanes.at(0);
+    vtkSmartPointer<vtkvmtkPolyDataCenterlines> ctrLine = ctrLines.at(0);
+    int index = ctrLine->GetOutput()->FindPoint(ctrPlane->GetCenter());
+
+    //Create a mapper and actor for centre lines clippers
+    for (unsigned int i = 0; i < ctrPlanes.size(); i++) {
+        vtkSmartPointer<vtkPolyDataMapper> clipperMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+        clipperMapper->SetInputConnection(ctrPlanes.at(i)->GetOutputPort());
+        clipperMapper->ScalarVisibilityOff();
+        vtkSmartPointer<vtkActor> clipperActor = vtkSmartPointer<vtkActor>::New();
+        clipperActor->SetMapper(clipperMapper);
+        clipperActor->GetProperty()->SetOpacity(1.0);
+        clipperActor->GetProperty()->SetColor(1, 1, 0);
+        renderer->AddActor(clipperActor);
+        clipperActors.push_back(clipperActor);
+        QString comboText = "DEFAULT";
+        if (pickedSeedLabels.at(i) == 11)
+            comboText = "LEFT SUPERIOR PV";
+        else if (pickedSeedLabels.at(i) == 12)
+            comboText = "LEFT MIDDLE PV";
+        else if (pickedSeedLabels.at(i) == 13)
+            comboText = "LEFT INFERIOR PV";
+        else if (pickedSeedLabels.at(i) == 14)
+            comboText = "LEFT COMMON PV";
+        else if (pickedSeedLabels.at(i) == 15)
+            comboText = "RIGHT SUPERIOR PV";
+        else if (pickedSeedLabels.at(i) == 16)
+            comboText = "RIGHT MIDDLE PV";
+        else if (pickedSeedLabels.at(i) == 17)
+            comboText = "RIGHT INFERIOR PV";
+        else if (pickedSeedLabels.at(i) == 18)
+            comboText = "RIGHT COMMON PV";
+        else if (pickedSeedLabels.at(i) == 19)
+            comboTex
