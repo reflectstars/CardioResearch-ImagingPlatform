@@ -398,4 +398,66 @@ void WallThicknessCalculationsClipperView::CtrPlanes() {
         else if (pickedSeedLabels.at(i) == 18)
             comboText = "RIGHT COMMON PV";
         else if (pickedSeedLabels.at(i) == 19)
-            comboTex
+            comboText = "APPENDAGE CUT";
+        else if (pickedSeedLabels.at(i) == 20)
+            comboText = "APPENDAGE UNCUT";
+        m_Controls.comboBox->insertItem(i, comboText);
+    }//_for
+    m_Controls.widget_1->GetRenderWindow()->Render();
+
+    //Adjust controllers
+    m_Controls.comboBox->setCurrentIndex(0);
+    m_Controls.slider->setValue(index);
+    m_Controls.slider->setEnabled(true);
+    m_Controls.spinBox->setEnabled(true);
+    m_Controls.comboBox->setEnabled(true);
+    m_Controls.button_2->setEnabled(false);
+}
+
+void WallThicknessCalculationsClipperView::ClipperImage() {
+
+    if (this->GetDataManagerSelection().empty()) {
+        QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation to clip!");
+        return;
+    } else if (clipper->GetCentreLines().size() == 0) {
+        QMessageBox::warning(NULL, "Attention", "Please maske sure you have computed centre lines!");
+        return;
+    } else if (clipper->GetCentreLinePolyPlanes().size() == 0) {
+        QMessageBox::warning(NULL, "Attention", "Please maske sure you have computed clipper planes!");
+        return;
+    } else {
+
+        //Check for selection of segmentation image
+        QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+        mitk::DataNode::Pointer segNode = nodes.at(0);
+        mitk::BaseData::Pointer data = segNode->GetData();
+        if (data) {
+
+            //Test if this data item is an image
+            mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+            if (image) {
+
+                //Check if the right segmentation
+                bool morphAnalysis = false;
+                if (segNode->GetName().compare(fileName.left(fileName.lastIndexOf(QChar('.'))).toStdString()) == 0) {
+                    int reply1 = QMessageBox::question(
+                        NULL, "Question", "Are you sure you want to clip the same segmentation used for creating the visualised mesh?",
+                        QMessageBox::Yes, QMessageBox::No);
+                    if (reply1 == QMessageBox::No) {
+                        QMessageBox::warning(NULL, "Attention", "Please select the correct segmentation to clip!");
+                        return;
+                    }//_if_no
+                    int reply2 = QMessageBox::question(
+                        NULL, "Question", "Do you want to save PV clipping information for morphological analysis?",
+                        QMessageBox::Yes, QMessageBox::No);
+                    if (reply2 == QMessageBox::Yes) {
+                        QMessageBox::information(NULL, "Attention", "Labelled bloodpool image and ostia information will be saved!");
+                        morphAnalysis = true;
+                    }//_if_yes
+                }//_if
+
+                this->BusyCursorOn();
+                this->GetDataStorage()->Remove(segNode);
+                clipper->ClipVeinsImage(pickedSeedLabels, image, morphAnalysis ? true : false);
+                this->BusyCursorOff();
+                QMessageBox::information(NULL, "Attention", "Segmentation is now clipped!
