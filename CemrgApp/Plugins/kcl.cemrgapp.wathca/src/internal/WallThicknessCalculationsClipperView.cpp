@@ -460,4 +460,83 @@ void WallThicknessCalculationsClipperView::ClipperImage() {
                 this->GetDataStorage()->Remove(segNode);
                 clipper->ClipVeinsImage(pickedSeedLabels, image, morphAnalysis ? true : false);
                 this->BusyCursorOff();
-                QMessageBox::information(NULL, "Attention", "Segmentation is now clipped!
+                QMessageBox::information(NULL, "Attention", "Segmentation is now clipped!");
+
+            } else {
+                QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+                return;
+            }//_image
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please select the loaded or created segmentation!");
+            return;
+        }//_data
+    }//_if
+
+    //Add to storage
+    mitk::DataNode::Pointer node = mitk::DataNode::New();
+    node->SetData(clipper->GetClippedSegImage());
+    node->SetName("PVeinsCroppedImage");
+    this->GetDataStorage()->Add(node);
+
+    //Adjust controllers
+    m_Controls.slider->setEnabled(false);
+    m_Controls.spinBox->setEnabled(false);
+    m_Controls.comboBox->setEnabled(false);
+    m_Controls.button_4->setEnabled(false);
+}
+
+void WallThicknessCalculationsClipperView::CtrPlanesPlacer() {
+
+    if (m_Controls.comboBox->count() == 0)
+        return;
+
+    //Retrieve cutting planes
+    std::vector<vtkSmartPointer<vtkRegularPolygonSource>> ctrPlanes = clipper->GetCentreLinePolyPlanes();
+    vtkSmartPointer<vtkRegularPolygonSource> ctrPlane = ctrPlanes.at(m_Controls.comboBox->currentIndex());
+
+    //Parameters recalculations to adjust
+    int position = m_Controls.slider->value();
+    double value = m_Controls.spinBox->value();
+    int indexBox = m_Controls.comboBox->currentIndex();
+
+    clipper->SetRadiusAdjustment(value);
+    clipper->CalcParamsOfPlane(ctrPlane, indexBox, position);
+
+    ctrPlane->Update();
+    m_Controls.widget_1->GetRenderWindow()->Render();
+}
+
+void WallThicknessCalculationsClipperView::CtrLinesSelector(int index) {
+
+    if (m_Controls.comboBox->count() == 0)
+        return;
+
+    //Find the right position
+    vtkSmartPointer<vtkPolyData> line = clipper->GetCentreLines().at(index)->GetOutput();
+    vtkSmartPointer<vtkRegularPolygonSource> ctrPlane = clipper->GetCentreLinePolyPlanes().at(index);
+    int position = line->FindPoint(ctrPlane->GetCenter());
+
+    //Find the right radius
+    vtkSmartPointer<vtkDoubleArray> radii = vtkDoubleArray::SafeDownCast(line->GetPointData()->GetArray("MaximumInscribedSphereRadius"));
+    double adjust = ctrPlane->GetRadius() / radii->GetValue(position);
+
+    //Adjust highlighted clipper
+    for (unsigned int i = 0; i < clipperActors.size(); i++)
+        clipperActors.at(i)->GetProperty()->SetOpacity(i == (unsigned)index ? 1.0 : 0.1);
+
+    //Set corresponding label
+    int type = clipper->GetManualType().at(index);
+    if (type == 0) {
+        m_Controls.label->setText(" Automatic ");
+        m_Controls.label->setStyleSheet("QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:yellow;}");
+    } else if (type == 1) {
+        m_Controls.label->setText(" Manual--1 ");
+        m_Controls.label->setStyleSheet("QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:lime;}");
+    } else {
+        m_Controls.label->setText(" Manual--2 ");
+        m_Controls.label->setStyleSheet("QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:red;}");
+    }//_if_type
+
+    //Set controllers
+    m_Controls.slider->setRange(0, line->GetNumberOfPoints() - 1);
+    m_Controls.slider->setValue(position);
