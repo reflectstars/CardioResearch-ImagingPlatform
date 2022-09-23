@@ -540,3 +540,72 @@ void WallThicknessCalculationsClipperView::CtrLinesSelector(int index) {
     //Set controllers
     m_Controls.slider->setRange(0, line->GetNumberOfPoints() - 1);
     m_Controls.slider->setValue(position);
+    m_Controls.spinBox->setValue(adjust);
+    pickedCutterSeeds->SetPoints(vtkSmartPointer<vtkPoints>::New());
+    m_Controls.widget_1->GetRenderWindow()->Render();
+}
+
+void WallThicknessCalculationsClipperView::Visualiser() {
+
+    vtkSmartPointer<vtkGlyph3D> glyph3D = vtkSmartPointer<vtkGlyph3D>::New();
+    vtkSmartPointer<vtkSphereSource> glyphSource = vtkSmartPointer<vtkSphereSource>::New();
+    glyph3D->SetInputData(pickedLineSeeds);
+    glyph3D->SetSourceConnection(glyphSource->GetOutputPort());
+    glyph3D->SetScaleModeToDataScalingOff();
+    glyph3D->SetScaleFactor(surface->GetVtkPolyData()->GetLength() * 0.01);
+    glyph3D->Update();
+
+    //Create a mapper and actor for glyph
+    vtkSmartPointer<vtkPolyDataMapper> glyphMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    glyphMapper->SetInputConnection(glyph3D->GetOutputPort());
+    vtkSmartPointer<vtkActor> glyphActor = vtkSmartPointer<vtkActor>::New();
+    glyphActor->SetMapper(glyphMapper);
+    glyphActor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+    glyphActor->PickableOff();
+    renderer->AddActor(glyphActor);
+
+    //Create a mapper and actor for surface
+    vtkSmartPointer<vtkPolyDataMapper> surfMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    surfMapper->SetInputData(surface->GetVtkPolyData());
+    surfMapper->ScalarVisibilityOff();
+    vtkSmartPointer<vtkActor> surfActor = vtkSmartPointer<vtkActor>::New();
+    surfActor->SetMapper(surfMapper);
+    surfActor->GetProperty()->SetOpacity(1);
+    renderer->AddActor(surfActor);
+}
+
+void WallThicknessCalculationsClipperView::PickCallBack() {
+
+    vtkSmartPointer<vtkCellPicker> picker = vtkSmartPointer<vtkCellPicker>::New();
+    picker->SetTolerance(1E-4 * surface->GetVtkPolyData()->GetLength());
+    int* eventPosition = interactor->GetEventPosition();
+    int result = picker->Pick(float(eventPosition[0]), float(eventPosition[1]), 0.0, renderer);
+    if (result == 0) return;
+    double* pickPosition = picker->GetPickPosition();
+    vtkIdList* pickedCellPointIds = surface->GetVtkPolyData()->GetCell(picker->GetCellId())->GetPointIds();
+
+    int pickedSeedId = -1;
+    double minDistance = 1E10;
+    for (int i = 0; i < pickedCellPointIds->GetNumberOfIds(); i++) {
+        double distance = vtkMath::Distance2BetweenPoints(
+            pickPosition, surface->GetVtkPolyData()->GetPoint(pickedCellPointIds->GetId(i)));
+        if (distance < minDistance) {
+            minDistance = distance;
+            pickedSeedId = pickedCellPointIds->GetId(i);
+        }//_if
+    }//_for
+    if (pickedSeedId == -1)
+        pickedSeedId = pickedCellPointIds->GetId(0);
+
+    pickedSeedIds->InsertNextId(pickedSeedId);
+    double* point = surface->GetVtkPolyData()->GetPoint(pickedSeedId);
+    pickedLineSeeds->GetPoints()->InsertNextPoint(point);
+    pickedLineSeeds->Modified();
+    m_Controls.widget_1->GetRenderWindow()->Render();
+}
+
+void WallThicknessCalculationsClipperView::ManualCutterCallBack() {
+
+    if (m_Controls.label->text() != " Manual--2 ") {
+
+        vtkSmartPoint
