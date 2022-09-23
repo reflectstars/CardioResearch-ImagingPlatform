@@ -608,4 +608,71 @@ void WallThicknessCalculationsClipperView::ManualCutterCallBack() {
 
     if (m_Controls.label->text() != " Manual--2 ") {
 
-        vtkSmartPoint
+        vtkSmartPointer<vtkGlyph3D> glyph3D = vtkSmartPointer<vtkGlyph3D>::New();
+        vtkSmartPointer<vtkSphereSource> glyphSource = vtkSmartPointer<vtkSphereSource>::New();
+        glyph3D->SetInputData(pickedCutterSeeds);
+        glyph3D->SetSourceConnection(glyphSource->GetOutputPort());
+        glyph3D->SetScaleModeToDataScalingOff();
+        glyph3D->SetScaleFactor(surface->GetVtkPolyData()->GetLength() * 0.01);
+        glyph3D->Update();
+
+        //Create a mapper and actor for glyph
+        vtkSmartPointer<vtkPolyDataMapper> glyphMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+        glyphMapper->SetInputConnection(glyph3D->GetOutputPort());
+        vtkSmartPointer<vtkActor> glyphActor = vtkSmartPointer<vtkActor>::New();
+        glyphActor->SetMapper(glyphMapper);
+        glyphActor->GetProperty()->SetColor(1.0, 0.0, 0.0);
+        glyphActor->PickableOff();
+        renderer->AddActor(glyphActor);
+
+        //Adjust labels
+        m_Controls.label->setText(" Manual--2 ");
+        m_Controls.label->setStyleSheet("QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:red;}");
+    }//_if
+
+    vtkSmartPointer<vtkCellPicker> picker = vtkSmartPointer<vtkCellPicker>::New();
+    picker->SetTolerance(1E-4 * surface->GetVtkPolyData()->GetLength());
+    int* eventPosition = interactor->GetEventPosition();
+    int result = picker->Pick(float(eventPosition[0]), float(eventPosition[1]), 0.0, renderer);
+    if (result == 0) return;
+    double* pickPosition = picker->GetPickPosition();
+    vtkIdList* pickedCellPointIds = surface->GetVtkPolyData()->GetCell(picker->GetCellId())->GetPointIds();
+
+    int pickedSeedId = -1;
+    double minDistance = 1E10;
+    for (int i = 0; i < pickedCellPointIds->GetNumberOfIds(); i++) {
+        double distance = vtkMath::Distance2BetweenPoints(
+            pickPosition, surface->GetVtkPolyData()->GetPoint(pickedCellPointIds->GetId(i)));
+        if (distance < minDistance) {
+            minDistance = distance;
+            pickedSeedId = pickedCellPointIds->GetId(i);
+        }//_if
+    }//_for
+    if (pickedSeedId == -1)
+        pickedSeedId = pickedCellPointIds->GetId(0);
+
+    double* point = surface->GetVtkPolyData()->GetPoint(pickedSeedId);
+    pickedCutterSeeds->GetPoints()->InsertNextPoint(point);
+    pickedCutterSeeds->Modified();
+    m_Controls.widget_1->GetRenderWindow()->Render();
+}
+
+void WallThicknessCalculationsClipperView::KeyCallBackFunc(vtkObject*, long unsigned int, void* ClientData, void*) {
+
+    WallThicknessCalculationsClipperView* self;
+    self = reinterpret_cast<WallThicknessCalculationsClipperView*>(ClientData);
+    std::string key = self->interactor->GetKeySym();
+
+    if (self->m_Controls.button_1->isEnabled()) {
+
+        if (key == "space") {
+
+            //Ask the labels
+            self->PickCallBack();
+            int dialogCode = self->inputs->exec();
+            QRect screenGeometry = QApplication::desktop()->screenGeometry();
+            int x = (screenGeometry.width() - self->inputs->width()) / 2;
+            int y = (screenGeometry.height() - self->inputs->height()) / 2;
+            self->inputs->move(x, y);
+
+            //Act on dialog
