@@ -675,4 +675,58 @@ void WallThicknessCalculationsClipperView::KeyCallBackFunc(vtkObject*, long unsi
             int y = (screenGeometry.height() - self->inputs->height()) / 2;
             self->inputs->move(x, y);
 
-            //Act on dialog
+            //Act on dialog return code
+            if (dialogCode == QDialog::Accepted) {
+
+                if (self->m_Labels.radioButton_1->isChecked()) {
+                    self->pickedSeedLabels.push_back(11);
+                    self->m_Labels.radioButton_1->setEnabled(false);
+                } else if (self->m_Labels.radioButton_2->isChecked()) {
+                    self->pickedSeedLabels.push_back(12);
+                    self->m_Labels.radioButton_2->setEnabled(false);
+                } else if (self->m_Labels.radioButton_3->isChecked()) {
+                    self->pickedSeedLabels.push_back(13);
+                    self->m_Labels.radioButton_3->setEnabled(false);
+                } else if (self->m_Labels.radioButton_4->isChecked()) {
+                    self->pickedSeedLabels.push_back(14);
+                    self->m_Labels.radioButton_4->setEnabled(false);
+                } else if (self->m_Labels.radioButton_5->isChecked()) {
+                    self->pickedSeedLabels.push_back(15);
+                    self->m_Labels.radioButton_5->setEnabled(false);
+                } else if (self->m_Labels.radioButton_6->isChecked()) {
+                    self->pickedSeedLabels.push_back(16);
+                    self->m_Labels.radioButton_6->setEnabled(false);
+                } else if (self->m_Labels.radioButton_7->isChecked()) {
+                    self->pickedSeedLabels.push_back(17);
+                    self->m_Labels.radioButton_7->setEnabled(false);
+                } else if (self->m_Labels.radioButton_8->isChecked()) {
+                    self->pickedSeedLabels.push_back(18);
+                    self->m_Labels.radioButton_8->setEnabled(false);
+                } else if (self->m_Labels.radioButton_9->isChecked()) {
+                    self->pickedSeedLabels.push_back(19);
+                    self->m_Labels.radioButton_9->setEnabled(false);
+                } else if (self->m_Labels.radioButton10->isChecked()) {
+                    self->pickedSeedLabels.push_back(20);
+                    self->m_Labels.radioButton10->setEnabled(false);
+                } else
+                    self->pickedSeedLabels.push_back(21);
+                self->m_Labels.radioButton_0->setChecked(true);
+
+            } else if (dialogCode == QDialog::Rejected) {
+                self->inputs->close();
+            }//_if
+
+        } else if (key == "Delete") {
+
+            //Clean up last dropped seed point
+            vtkSmartPointer<vtkPoints> newPoints = vtkSmartPointer<vtkPoints>::New();
+            vtkSmartPointer<vtkPoints> points = self->pickedLineSeeds->GetPoints();
+            for (int i = 0; i < points->GetNumberOfPoints() - 1; i++)
+                newPoints->InsertNextPoint(points->GetPoint(i));
+            self->pickedLineSeeds->SetPoints(newPoints);
+            vtkSmartPointer<vtkIdList> newPickedSeedIds = vtkSmartPointer<vtkIdList>::New();
+            newPickedSeedIds->Initialize();
+            vtkSmartPointer<vtkIdList> pickedSeedIds = self->pickedSeedIds;
+            for (int i = 0; i < pickedSeedIds->GetNumberOfIds() - 1; i++)
+                newPickedSeedIds->InsertNextId(pickedSeedIds->GetId(i));
+            self->pickedSeedIds = newPic
