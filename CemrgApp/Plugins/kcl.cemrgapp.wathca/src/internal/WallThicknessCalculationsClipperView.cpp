@@ -729,4 +729,63 @@ void WallThicknessCalculationsClipperView::KeyCallBackFunc(vtkObject*, long unsi
             vtkSmartPointer<vtkIdList> pickedSeedIds = self->pickedSeedIds;
             for (int i = 0; i < pickedSeedIds->GetNumberOfIds() - 1; i++)
                 newPickedSeedIds->InsertNextId(pickedSeedIds->GetId(i));
-            self->pickedSeedIds = newPic
+            self->pickedSeedIds = newPickedSeedIds;
+
+            if (self->pickedSeedLabels.empty() == false) {
+                int radioButtonNumber = self->pickedSeedLabels.back() - 10;
+                if (radioButtonNumber == 1)
+                    self->m_Labels.radioButton_1->setEnabled(true);
+                else if (radioButtonNumber == 2)
+                    self->m_Labels.radioButton_2->setEnabled(true);
+                else if (radioButtonNumber == 3)
+                    self->m_Labels.radioButton_3->setEnabled(true);
+                else if (radioButtonNumber == 4)
+                    self->m_Labels.radioButton_4->setEnabled(true);
+                else if (radioButtonNumber == 5)
+                    self->m_Labels.radioButton_5->setEnabled(true);
+                else if (radioButtonNumber == 6)
+                    self->m_Labels.radioButton_6->setEnabled(true);
+                else if (radioButtonNumber == 7)
+                    self->m_Labels.radioButton_7->setEnabled(true);
+                else if (radioButtonNumber == 8)
+                    self->m_Labels.radioButton_8->setEnabled(true);
+                else if (radioButtonNumber == 9)
+                    self->m_Labels.radioButton_9->setEnabled(true);
+                else if (radioButtonNumber == 10)
+                    self->m_Labels.radioButton10->setEnabled(true);
+                self->pickedSeedLabels.pop_back();
+            }//_if
+
+            self->m_Controls.widget_1->GetRenderWindow()->Render();
+        }//_if_space
+
+    } else if (self->clipper->GetCentreLinePolyPlanes().size() != 0 && !self->m_Controls.button_1->isEnabled() &&
+        /*self->m_Controls.button_3->isEnabled() &&*/ self->m_Controls.button_4->isEnabled()) {
+
+        double adjustments[2];
+        int idxClipper = self->m_Controls.comboBox->currentIndex();
+        adjustments[0] = self->clipper->GetMClipperAngles()[idxClipper][0];
+        adjustments[1] = self->clipper->GetMClipperAngles()[idxClipper][1];
+
+        if (key == "Up") {
+
+            self->m_Controls.label->setText(" Manual--1 ");
+            QString style = "QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:lime;}";
+            self->m_Controls.label->setStyleSheet(style);
+            if (self->clipper->GetMClipperAngles()[idxClipper][0] >= 180.0)
+                adjustments[0] = 0.0;
+            else
+                adjustments[0] = self->clipper->GetMClipperAngles()[idxClipper][0] + 0.1;
+            self->clipperActors.at(idxClipper)->GetProperty()->SetColor(0, 1, 0);
+            self->clipper->SetMClipperAngles(adjustments, idxClipper);
+            self->CtrPlanesPlacer();
+
+        } else if (key == "Down") {
+
+            self->m_Controls.label->setText(" Manual--1 ");
+            QString style = "QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:lime;}";
+            self->m_Controls.label->setStyleSheet(style);
+            if (self->clipper->GetMClipperAngles()[idxClipper][0] <= 0.0)
+                adjustments[0] = 180.0;
+            else
+                adjustments[0] = self->clipper->GetMClipperAngles()[idxClipper][0] - 0.1;
