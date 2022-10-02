@@ -789,3 +789,66 @@ void WallThicknessCalculationsClipperView::KeyCallBackFunc(vtkObject*, long unsi
                 adjustments[0] = 180.0;
             else
                 adjustments[0] = self->clipper->GetMClipperAngles()[idxClipper][0] - 0.1;
+            self->clipperActors.at(idxClipper)->GetProperty()->SetColor(0, 1, 0);
+            self->clipper->SetMClipperAngles(adjustments, idxClipper);
+            self->CtrPlanesPlacer();
+
+        } else if (key == "Right") {
+
+            self->m_Controls.label->setText(" Manual--1 ");
+            QString style = "QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:lime;}";
+            self->m_Controls.label->setStyleSheet(style);
+            if (self->clipper->GetMClipperAngles()[idxClipper][1] >= 360.0)
+                adjustments[1] = 0.0;
+            else
+                adjustments[1] = self->clipper->GetMClipperAngles()[idxClipper][1] + 0.1;
+            self->clipperActors.at(idxClipper)->GetProperty()->SetColor(0, 1, 0);
+            self->clipper->SetMClipperAngles(adjustments, idxClipper);
+            self->CtrPlanesPlacer();
+
+        } else if (key == "Left") {
+
+            self->m_Controls.label->setText(" Manual--1 ");
+            QString style = "QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:lime;}";
+            self->m_Controls.label->setStyleSheet(style);
+            if (self->clipper->GetMClipperAngles()[idxClipper][1] <= 0.0)
+                adjustments[1] = 360.0;
+            else
+                adjustments[1] = self->clipper->GetMClipperAngles()[idxClipper][1] - 0.1;
+            self->clipperActors.at(idxClipper)->GetProperty()->SetColor(0, 1, 0);
+            self->clipper->SetMClipperAngles(adjustments, idxClipper);
+            self->CtrPlanesPlacer();
+
+        } else if (key == "space") {
+
+            self->clipperActors.at(idxClipper)->GetProperty()->SetColor(1, 0, 0);
+            self->ManualCutterCallBack();
+            self->clipper->SetMClipperSeeds(self->pickedCutterSeeds, self->m_Controls.comboBox->currentIndex());
+            self->CtrPlanesPlacer();
+
+        } else if (key == "Delete") {
+
+            vtkSmartPointer<vtkPoints> newPoints = vtkSmartPointer<vtkPoints>::New();
+            vtkSmartPointer<vtkPoints> points = self->pickedCutterSeeds->GetPoints();
+            for (int i = 0; i < points->GetNumberOfPoints() - 1; i++)
+                newPoints->InsertNextPoint(points->GetPoint(i));
+            self->pickedCutterSeeds->SetPoints(newPoints);
+            self->clipper->SetMClipperSeeds(self->pickedCutterSeeds, self->m_Controls.comboBox->currentIndex());
+            self->CtrPlanesPlacer();
+
+        } else if (key == "a" || key == "A") {
+
+            self->m_Controls.label->setText(" Automatic ");
+            QString style = "QLabel {border-width:1px; border-color:black; border-radius:10px; background-color:yellow;}";
+            self->m_Controls.label->setStyleSheet(style);
+            self->clipper->SetToAutomaticClipperMode(idxClipper);
+            self->clipperActors.at(idxClipper)->GetProperty()->SetColor(1, 1, 0);
+            self->CtrPlanesPlacer();
+
+        } else if (key == "o" || key == "O") {
+
+            if (self->surfActor->GetProperty()->GetOpacity() == 1.0)
+                self->surfActor->GetProperty()->SetOpacity(0.5);
+            else {
+                self->surfActor->GetProperty()->SetOpacity(1.0);
+                for (u
