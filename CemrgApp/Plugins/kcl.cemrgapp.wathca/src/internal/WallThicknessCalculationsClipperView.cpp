@@ -911,4 +911,8 @@ void WallThicknessCalculationsClipperView::KeyCallBackFunc(vtkObject*, long unsi
             txtActor->SetInput(shortcuts.c_str());
             txtActor->GetTextProperty()->SetFontSize(14);
             txtActor->GetTextProperty()->SetColor(1.0, 1.0, 1.0);
-            self->rendere
+            self->renderer->AddActor2D(txtActor);
+
+        }//_if
+    }//_if_main
+}
