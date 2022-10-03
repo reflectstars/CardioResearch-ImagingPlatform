@@ -851,4 +851,64 @@ void WallThicknessCalculationsClipperView::KeyCallBackFunc(vtkObject*, long unsi
                 self->surfActor->GetProperty()->SetOpacity(0.5);
             else {
                 self->surfActor->GetProperty()->SetOpacity(1.0);
-                for (u
+                for (unsigned int i = 0; i < self->clipperActors.size(); i++)
+                    self->clipperActors.at(i)->GetProperty()->SetOpacity(1.0);
+            }//_if
+            self->m_Controls.widget_1->GetRenderWindow()->Render();
+
+        }//_if_key
+
+    } else if (!self->m_Controls.button_1->isEnabled()) {
+
+        if (key == "r" || key == "R") {
+
+            //Clear renderer
+            self->renderer->RemoveAllViewProps();
+            self->clipperActors.clear();
+            self->pickedSeedLabels.clear();
+            self->pickedSeedIds = vtkSmartPointer<vtkIdList>::New();
+            self->pickedSeedIds->Initialize();
+            self->pickedLineSeeds = vtkSmartPointer<vtkPolyData>::New();
+            self->pickedLineSeeds->Initialize();
+            self->pickedLineSeeds->SetPoints(vtkSmartPointer<vtkPoints>::New());
+            self->pickedCutterSeeds = vtkSmartPointer<vtkPolyData>::New();
+            self->pickedCutterSeeds->Initialize();
+            self->pickedCutterSeeds->SetPoints(vtkSmartPointer<vtkPoints>::New());
+            self->Visualiser();
+
+            //Reset clipper
+            if (self->m_Controls.button_2->isEnabled() && self->m_Controls.button_4->isEnabled())
+                self->clipper = std::unique_ptr<CemrgAtriaClipper>(new CemrgAtriaClipper(self->directory, self->surface));
+            else
+                self->clipper->ResetCtrLinesClippingPlanes();
+
+            //Reset controls
+            self->m_Controls.comboBox->clear();
+            self->m_Controls.slider->setRange(0, 2);
+            self->m_Controls.slider->setValue(0);
+            self->m_Controls.spinBox->setValue(2.0);
+            self->m_Controls.slider->setEnabled(false);
+            self->m_Controls.spinBox->setEnabled(false);
+            self->m_Controls.comboBox->setEnabled(false);
+            self->m_Controls.button_1->setEnabled(true);
+            self->m_Controls.button_2->setEnabled(true);
+            self->m_Controls.button_4->setEnabled(true);
+            self->m_Controls.checkBox->setEnabled(true);
+            self->m_Labels.radioButton_1->setEnabled(true);
+            self->m_Labels.radioButton_2->setEnabled(true);
+            self->m_Labels.radioButton_3->setEnabled(true);
+            self->m_Labels.radioButton_4->setEnabled(true);
+            self->m_Labels.radioButton_5->setEnabled(true);
+            self->m_Labels.radioButton_6->setEnabled(true);
+            self->m_Labels.radioButton_7->setEnabled(true);
+            self->m_Labels.radioButton_8->setEnabled(true);
+            self->m_Labels.radioButton_9->setEnabled(true);
+            self->m_Labels.radioButton10->setEnabled(true);
+
+            //Setup shortcuts
+            vtkSmartPointer<vtkTextActor> txtActor = vtkSmartPointer<vtkTextActor>::New();
+            std::string shortcuts = "R: reset centrelines\nSpace: add seed point\nDelete: remove seed point";
+            txtActor->SetInput(shortcuts.c_str());
+            txtActor->GetTextProperty()->SetFontSize(14);
+            txtActor->GetTextProperty()->SetColor(1.0, 1.0, 1.0);
+            self->rendere
