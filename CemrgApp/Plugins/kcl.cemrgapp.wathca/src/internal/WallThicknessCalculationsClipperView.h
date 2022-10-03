@@ -86,4 +86,22 @@ private:
     void Visualiser();
     void PickCallBack();
     void ManualCutterCallBack();
-    static void KeyCallBackFunc(vtkObject*, long unsigned int, void* ClientDa
+    static void KeyCallBackFunc(vtkObject*, long unsigned int, void* ClientData, void*);
+
+    mitk::Surface::Pointer surface;
+    vtkSmartPointer<vtkActor> surfActor;
+    std::vector<int> pickedSeedLabels;
+    vtkSmartPointer<vtkIdList> pickedSeedIds;
+    vtkSmartPointer<vtkPolyData> pickedLineSeeds;
+    vtkSmartPointer<vtkPolyData> pickedCutterSeeds;
+    std::unique_ptr<CemrgAtriaClipper> clipper;
+    std::vector<vtkSmartPointer<vtkActor>> clipperActors;
+    QDialog* inputs;
+    static QString fileName;
+    static QString directory;
+    vtkSmartPointer<vtkRenderer> renderer;
+    vtkSmartPointer<vtkCallbackCommand> callBack;
+    vtkSmartPointer<vtkRenderWindowInteractor> interactor;
+};
+
+#endif // WallThicknessCalculationsClipperView_h
