@@ -222,4 +222,66 @@ void WallThicknessCalculationsView::CropIMGS() {
     if (nodes.empty()) {
         QMessageBox::warning(
                     NULL, "Attention",
-                    "Please select an image fro
+                    "Please select an image from the Data Manager to perform cropping!");
+        return;
+    }//_if
+
+    //Check to cut now or not
+    if (m_Controls.button_2_2->text() == QString::fromStdString("Are you done?")) {
+
+        QString path;
+        //Ask the user for a dir to locate data
+        if (directory.isEmpty()) {
+            directory = QFileDialog::getExistingDirectory(
+                        NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                        QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+            if (directory.isEmpty() || directory.simplified().contains(" ")) {
+                QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+                directory = QString();
+                return;
+            }//_if
+        }
+
+        //Cut selected image
+        this->BusyCursorOn();
+        mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+        mitk::Image::Pointer outputImage = CemrgCommonUtils::CropImage();
+        path = directory + "/" + CemrgCommonUtils::GetImageNode()->GetName().c_str() + ".nii";
+        mitk::IOUtil::Save(outputImage, path.toStdString());
+        mitk::ProgressBar::GetInstance()->Progress();
+        this->BusyCursorOff();
+
+        //Update datastorage
+        CemrgCommonUtils::AddToStorage(outputImage, CemrgCommonUtils::GetImageNode()->GetName(), this->GetDataStorage());
+        this->GetDataStorage()->Remove(CemrgCommonUtils::GetImageNode());
+        this->GetDataStorage()->Remove(CemrgCommonUtils::GetCuttingNode());
+        mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+        m_Controls.button_2_2->setText("Crop Images");
+        return;
+    }//_if
+
+    //Prepare cutting cuboid
+    mitk::Cuboid::Pointer cuttingObject = mitk::Cuboid::New();
+    mitk::DataNode::Pointer cuttingNode = mitk::DataNode::New();
+    cuttingNode->SetData(cuttingObject);
+    cuttingNode->SetProperty("opacity", mitk::FloatProperty::New(0.4));
+    cuttingNode->SetProperty("color", mitk::ColorProperty::New(1.0, 1.0, 0.0));
+    cuttingNode->SetProperty("name", mitk::StringProperty::New("Cropper"));
+    this->GetDataStorage()->Add(cuttingNode);
+
+    //Mouse interactions
+    mitk::AffineImageCropperInteractor::Pointer affineDataInteractor = mitk::AffineImageCropperInteractor::New();
+    affineDataInteractor->LoadStateMachine("ClippingPlaneInteraction3D.xml", us::ModuleRegistry::GetModule("MitkDataTypesExt"));
+    affineDataInteractor->SetEventConfig("CropperDeformationConfig.xml", us::ModuleRegistry::GetModule("MitkDataTypesExt"));
+    affineDataInteractor->SetDataNode(cuttingNode);
+    cuttingNode->SetBoolProperty("pickable", true);
+
+    //Fit the cuboid to the image
+    mitk::Image::Pointer imageToCut;
+    mitk::BoundingObject::Pointer cuttingCube;
+    mitk::DataNode::Pointer imageNode = nodes.at(0);
+    mitk::BaseData::Pointer data = imageNode->GetData();
+    cuttingCube = dynamic_cast<mitk::BoundingObject*>(cuttingNode->GetData());
+    if (data) {
+        
