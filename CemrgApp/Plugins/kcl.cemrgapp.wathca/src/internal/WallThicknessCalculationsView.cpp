@@ -140,4 +140,86 @@ void WallThicknessCalculationsView::OnSelectionChanged(
         berry::IWorkbenchPart::Pointer /*source*/, const QList<mitk::DataNode::Pointer>& /*nodes*/) {
 }
 
-void WallThicknessCalculationsView::Lo
+void WallThicknessCalculationsView::LoadDICOM() {
+
+    //Use MITK DICOM editor
+    QString editor_id = "org.mitk.editors.dicomeditor";
+    berry::IEditorInput::Pointer input(new berry::FileEditorInput(QString()));
+    this->GetSite()->GetPage()->OpenEditor(input, editor_id);
+}
+
+void WallThicknessCalculationsView::ProcessIMGS() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_2_1->isVisible()) {
+        m_Controls.button_2_1->setVisible(false);
+        m_Controls.button_2_2->setVisible(false);
+        m_Controls.button_2_3->setVisible(false);
+        m_Controls.button_2_4->setVisible(false);
+    } else {
+        m_Controls.button_2_1->setVisible(true);
+        m_Controls.button_2_2->setVisible(true);
+        m_Controls.button_2_3->setVisible(true);
+        m_Controls.button_2_4->setVisible(true);
+    }
+}
+
+void WallThicknessCalculationsView::ConvertNII() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() < 1) {
+        QMessageBox::warning(
+                    NULL, "Attention",
+                    "Please load and select images from the Data Manager before starting this step!");
+        return;
+    }//_if
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+                    NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                    QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Generic Conversion to nii
+    int ctr = 0;
+    QString path;
+    bool resampleImage = false, reorientToRAI = true;
+
+    this->BusyCursorOn();
+    mitk::ProgressBar::GetInstance()->AddStepsToDo(nodes.size());
+    foreach (mitk::DataNode::Pointer node, nodes) {
+        path = directory + "/dcm-" + QString::number(ctr++) + ".nii";
+        bool successfulNitfi = CemrgCommonUtils::ConvertToNifti(node->GetData(), path, resampleImage, reorientToRAI);
+        if (successfulNitfi) {
+            this->GetDataStorage()->Remove(node);
+        } else {
+            mitk::ProgressBar::GetInstance()->Progress(nodes.size());
+            return;
+        }
+        mitk::ProgressBar::GetInstance()->Progress();
+    }//_for
+    nodes.clear();
+    this->BusyCursorOff();
+
+    //Load first item
+    ctr = 0;
+    path = directory + "/dcm-" + QString::number(ctr) + ".nii";
+    mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+    mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+}
+
+void WallThicknessCalculationsView::CropIMGS() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+                    NULL, "Attention",
+                    "Please select an image fro
