@@ -284,4 +284,89 @@ void WallThicknessCalculationsView::CropIMGS() {
     mitk::BaseData::Pointer data = imageNode->GetData();
     cuttingCube = dynamic_cast<mitk::BoundingObject*>(cuttingNode->GetData());
     if (data) {
-        
+        //Test if this data item is an image
+        imageToCut = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (imageToCut)
+            cuttingCube->FitGeometry(imageToCut->GetGeometry());
+        else return;
+    } else return;
+
+    //To be used for actual cutting
+    CemrgCommonUtils::SetImageToCut(imageToCut);
+    CemrgCommonUtils::SetCuttingCube(cuttingCube);
+    CemrgCommonUtils::SetImageNode(imageNode);
+    CemrgCommonUtils::SetCuttingNode(cuttingNode);
+    m_Controls.button_2_2->setText("Are you done?");
+}
+
+void WallThicknessCalculationsView::ResampIMGS() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+                    NULL, "Attention",
+                    "Please select an image from the Data Manager to perform downsampling!");
+        return;
+    }
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+                    NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                    QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Find the selected node
+    QString path;
+    mitk::DataNode::Pointer imgNode = nodes.at(0);
+    mitk::BaseData::Pointer data = imgNode->GetData();
+    if (data) {
+
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (image) {
+
+            bool ok;
+            int factor = QInputDialog::getInt(NULL, tr("Downsampling"), tr("By factor of:"), 3, 1, 5, 1, &ok);
+            if (ok) {
+
+                //Downsample selected image
+                this->BusyCursorOn();
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+                mitk::Image::Pointer outputImage = CemrgCommonUtils::Downsample(image, factor);
+                path = directory + "/" + imgNode->GetName().c_str() + ".nii";
+                mitk::IOUtil::Save(outputImage, path.toStdString());
+                mitk::ProgressBar::GetInstance()->Progress();
+                this->BusyCursorOff();
+
+                //Update datastorage
+                CemrgCommonUtils::AddToStorage(outputImage, imgNode->GetName(), this->GetDataStorage());
+                this->GetDataStorage()->Remove(imgNode);
+                mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+            }//_if
+        } else
+            return;
+    } else
+        return;
+}
+
+void WallThicknessCalculationsView::ApplyFilter() {
+}
+
+void WallThicknessCalculationsView::SegmentIMGS() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_3_1->isVisible()) {
+        m_Controls.button_3_1->setVisible(false);
+        m_Controls.button_3_2->setVisible(false);
+        m_Controls.button_3_3->setVisible(false);
+        return;
+    } else {
+       
