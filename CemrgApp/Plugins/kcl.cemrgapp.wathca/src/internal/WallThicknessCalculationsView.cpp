@@ -516,4 +516,59 @@ void WallThicknessCalculationsView::MorphologyAnalysis() {
             typedef itk::ImageRegionIteratorWithIndex<ImageType> ItType;
             ImageType::Pointer analyticItkImage = ImageType::New();
             CastToItkImage(analyticImage, analyticItkImage);
-            ItType itLbl(analyticItkImage, analyticItkImage->GetRequ
+            ItType itLbl(analyticItkImage, analyticItkImage->GetRequestedRegion());
+            for (itLbl.GoToBegin(); !itLbl.IsAtEnd(); ++itLbl) {
+                if ((int)itLbl.Get() == APPENDAGECUT || (int)itLbl.Get() == APPENDAGEUNCUT) {
+                    itLbl.Set(0);
+                }//_if
+            }//_for
+
+            //Relabel the components to separate bloodpool and appendage
+            typedef itk::ConnectedComponentImageFilter<ImageType, ImageType> ConnectedComponentImageFilterType;
+            ConnectedComponentImageFilterType::Pointer connected = ConnectedComponentImageFilterType::New();
+            connected->SetInput(analyticItkImage);
+            connected->Update();
+            typedef itk::RelabelComponentImageFilter<ImageType, ImageType> RelabelFilterType;
+            RelabelFilterType::Pointer relabeler = RelabelFilterType::New();
+            relabeler->SetInput(connected->GetOutput());
+            relabeler->Update();
+
+            //Keep the selected labels
+            typedef itk::LabelObject<short, 3> LabelObjectType;
+            typedef itk::LabelMap<LabelObjectType> LabelMapType;
+            typedef itk::LabelImageToLabelMapFilter< ImageType, LabelMapType > LabelImageToLabelMapFilterType;
+            LabelImageToLabelMapFilterType::Pointer labelMapConverter = LabelImageToLabelMapFilterType::New();
+            labelMapConverter->SetInput(relabeler->GetOutput());
+            labelMapConverter->SetBackgroundValue(0);
+            typedef itk::LabelSelectionLabelMapFilter<LabelMapType> SelectorType;
+            SelectorType::Pointer selector = SelectorType::New();
+            selector->SetInput(labelMapConverter->GetOutput());
+            selector->SetLabel(2);
+
+            //Import to MITK image
+            typedef itk::LabelMapToLabelImageFilter<LabelMapType, ImageType> LabelMapToLabelImageFilterType;
+            LabelMapToLabelImageFilterType::Pointer labelImageConverter = LabelMapToLabelImageFilterType::New();
+            labelImageConverter->SetInput(selector->GetOutput(0));
+            labelImageConverter->Update();
+            mitk::Image::Pointer ap = mitk::ImportItkImage(labelImageConverter->GetOutput());
+            mitk::Image::Pointer bp = mitk::IOUtil::Load<mitk::Image>(directory.toStdString() + "/PVeinsCroppedImage.nii");
+
+            //Ask for user input to set the parameters
+            QDialog* inputs = new QDialog(0,0);
+            m_UIMeshing.setupUi(inputs);
+            connect(m_UIMeshing.buttonBox, &QDialogButtonBox::accepted, inputs, &QDialog::accept);
+            connect(m_UIMeshing.buttonBox, &QDialogButtonBox::rejected, inputs, &QDialog::reject);
+            int dialogCode = inputs->exec();
+
+            //Act on dialog return code
+            if (dialogCode == QDialog::Accepted) {
+
+                bool ok1, ok2, ok3, ok4;
+                float th = m_UIMeshing.lineEdit_1->text().toFloat(&ok1);
+                float bl = m_UIMeshing.lineEdit_2->text().toFloat(&ok2);
+                int smth = m_UIMeshing.lineEdit_3->text().toInt(&ok3);
+                float ds = m_UIMeshing.lineEdit_4->text().toFloat(&ok4);
+
+                //Set default values
+                if (!ok1 || !ok2 || !ok3 || !ok4)
+             
