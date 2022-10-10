@@ -446,4 +446,74 @@ void WallThicknessCalculationsView::CombineSegs() {
             typedef itk::Image<short, 3> ImageType;
             typedef itk::AddImageFilter<ImageType, ImageType, ImageType> AddFilterType;
             QString path = directory + "/segmentation.nii";
-            //Cast seg to ITK for
+            //Cast seg to ITK format
+            ImageType::Pointer itkImage_0 = ImageType::New();
+            ImageType::Pointer itkImage_1 = ImageType::New();
+            CastToItkImage(image_0, itkImage_0);
+            CastToItkImage(image_1, itkImage_1);
+            AddFilterType::Pointer addFilter = AddFilterType::New();
+            addFilter->SetInput1(itkImage_0);
+            addFilter->SetInput2(itkImage_1);
+            addFilter->UpdateLargestPossibleRegion();
+
+            //Save result
+            mitk::Image::Pointer resImage = mitk::ImportItkImage(addFilter->GetOutput())->Clone();
+            mitk::IOUtil::Save(resImage, path.toStdString());
+            CemrgCommonUtils::AddToStorage(resImage, "segmentation", this->GetDataStorage());
+            fileName = "segmentation.nii";
+
+        } else
+            return;
+    } else
+        return;
+}
+
+void WallThicknessCalculationsView::ClipperPV() {
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+                    NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                    QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Show the plugin
+    this->GetSite()->GetPage()->ResetPerspective();
+    WallThicknessCalculationsClipperView::SetDirectoryFile(directory, fileName);
+    this->GetSite()->GetPage()->ShowView("org.mitk.views.wathcaclipperview");
+}
+
+void WallThicknessCalculationsView::MorphologyAnalysis() {
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+                    NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                    QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }//_if
+
+    try {
+
+        QString pathAnalytic = directory + "/AnalyticBloodpool.nii";
+        mitk::Image::Pointer analyticImage = mitk::IOUtil::Load<mitk::Image>(pathAnalytic.toStdString());
+        QString pathCropped = directory + "/PVeinsCroppedImage.nii";
+        mitk::Image::Pointer croppedPVImage = mitk::IOUtil::Load<mitk::Image>(pathCropped.toStdString());
+
+        if (analyticImage && croppedPVImage) {
+
+            //Loop through labelled image
+            typedef itk::Image<short, 3> ImageType;
+            typedef itk::ImageRegionIteratorWithIndex<ImageType> ItType;
+            ImageType::Pointer analyticItkImage = ImageType::New();
+            CastToItkImage(analyticImage, analyticItkImage);
+            ItType itLbl(analyticItkImage, analyticItkImage->GetRequ
