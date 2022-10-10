@@ -369,4 +369,81 @@ void WallThicknessCalculationsView::SegmentIMGS() {
         m_Controls.button_3_3->setVisible(false);
         return;
     } else {
-       
+        m_Controls.button_3_1->setVisible(true);
+        m_Controls.button_3_2->setVisible(true);
+        m_Controls.button_3_3->setVisible(true);
+    }//_if
+
+    int reply = QMessageBox::question(
+                NULL, "Question", "Do you have a segmentation to load?",
+                QMessageBox::Yes, QMessageBox::No);
+
+    if (reply == QMessageBox::Yes) {
+
+        QString path = QFileDialog::getOpenFileName(
+                    NULL, "Open Segmentation file", mitk::IOUtil::GetProgramPath().c_str(),
+                    QmitkIOUtil::GetFileOpenFilterString());
+        if (path.isEmpty())
+            return;
+        mitk::IOUtil::Load(path.toStdString(), *this->GetDataStorage());
+        mitk::RenderingManager::GetInstance()->InitializeViewsByBoundingObjects(this->GetDataStorage());
+
+        //Restore image name
+        QFileInfo fullPathInfo(path);
+        fileName = fullPathInfo.fileName();
+        directory = fullPathInfo.dir().absolutePath();
+
+    } else {
+        //Show the plugin
+        QMessageBox::information(
+                    NULL, "Attention",
+                    "After finalising the segmentation, save the image and load back using this same button!");
+        this->GetSite()->GetPage()->ShowView("org.mitk.views.segmentation");
+    }//_if
+}
+
+void WallThicknessCalculationsView::SelectROI() {
+}
+
+void WallThicknessCalculationsView::SelectLandmarks() {
+}
+
+void WallThicknessCalculationsView::CombineSegs() {
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.size() != 2) {
+        QMessageBox::warning(
+                    NULL, "Attention",
+                    "Please select both segmentations from the Data Manager to create a surface for clipping!");
+        return;
+    }//_if
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+                    NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                    QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }//_if
+
+    //Find the selected nodes
+    mitk::DataNode::Pointer segNode_0 = nodes.at(0);
+    mitk::BaseData::Pointer data_0 = segNode_0->GetData();
+    mitk::DataNode::Pointer segNode_1 = nodes.at(1);
+    mitk::BaseData::Pointer data_1 = segNode_1->GetData();
+    if (data_0 && data_1) {
+        //Test if this data item is an image
+        mitk::Image::Pointer image_0 = dynamic_cast<mitk::Image*>(data_0.GetPointer());
+        mitk::Image::Pointer image_1 = dynamic_cast<mitk::Image*>(data_1.GetPointer());
+        if (image_0 && image_1) {
+
+            //Add images
+            typedef itk::Image<short, 3> ImageType;
+            typedef itk::AddImageFilter<ImageType, ImageType, ImageType> AddFilterType;
+            QString path = directory + "/segmentation.nii";
+            //Cast seg to ITK for
