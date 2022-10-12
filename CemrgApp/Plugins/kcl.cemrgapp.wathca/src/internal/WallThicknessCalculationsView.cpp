@@ -571,4 +571,61 @@ void WallThicknessCalculationsView::MorphologyAnalysis() {
 
                 //Set default values
                 if (!ok1 || !ok2 || !ok3 || !ok4)
-             
+                    QMessageBox::warning(NULL, "Attention", "Reverting to default parameters!");
+                if (!ok1) th   = 0.5;
+                if (!ok2) bl   = 0.8;
+                if (!ok3) smth = 3;
+                if (!ok4) ds   = 0.5;
+                //_if
+
+                this->BusyCursorOn();
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(2);
+                auto filter1 = mitk::ManualSegmentationToSurfaceFilter::New();
+                filter1->SetInput(bp);
+                filter1->SetThreshold(th);
+                filter1->SetUseGaussianImageSmooth(true);
+                filter1->SetSmooth(true);
+                filter1->SetMedianFilter3D(true);
+                filter1->InterpolationOn();
+                filter1->SetGaussianStandardDeviation(bl);
+                filter1->SetMedianKernelSize(smth, smth, smth);
+                filter1->SetDecimate(mitk::ImageToSurfaceFilter::QuadricDecimation);
+                filter1->SetTargetReduction(ds);
+                filter1->UpdateLargestPossibleRegion();
+                mitk::ProgressBar::GetInstance()->Progress();
+                mitk::Surface::Pointer shell1 = filter1->GetOutput();
+                vtkSmartPointer<vtkPolyData> pd1 = shell1->GetVtkPolyData();
+                pd1->SetVerts(nullptr);
+                pd1->SetLines(nullptr);
+                vtkSmartPointer<vtkPolyDataConnectivityFilter> connectivityFilter1 = vtkSmartPointer<vtkPolyDataConnectivityFilter>::New();
+                connectivityFilter1->SetInputData(pd1);
+                connectivityFilter1->ColorRegionsOff();
+                connectivityFilter1->SetExtractionModeToLargestRegion();
+                connectivityFilter1->Update();
+                vtkSmartPointer<vtkPolyDataNormals> normals1 = vtkSmartPointer<vtkPolyDataNormals>::New();
+                normals1->AutoOrientNormalsOn();
+                normals1->FlipNormalsOff();
+                normals1->SetInputConnection(connectivityFilter1->GetOutputPort());
+                normals1->Update();
+                shell1->SetVtkPolyData(normals1->GetOutput());
+                mitk::Surface::Pointer surfLA = shell1->Clone();
+                mitk::ProgressBar::GetInstance()->Progress();
+                this->BusyCursorOff();
+                QMessageBox::information(NULL, "Attention", "Operations (Bloodpool) Finished!");
+
+                this->BusyCursorOn();
+                mitk::ProgressBar::GetInstance()->AddStepsToDo(2);
+                auto filter2 = mitk::ManualSegmentationToSurfaceFilter::New();
+                filter2->SetInput(ap);
+                filter2->SetThreshold(th);
+                filter2->SetUseGaussianImageSmooth(true);
+                filter2->SetSmooth(true);
+                filter2->SetMedianFilter3D(true);
+                filter2->InterpolationOn();
+                filter2->SetGaussianStandardDeviation(bl);
+                filter2->SetMedianKernelSize(smth, smth, smth);
+                filter2->SetDecimate(mitk::ImageToSurfaceFilter::QuadricDecimation);
+                filter2->SetTargetReduction(ds);
+                filter2->UpdateLargestPossibleRegion();
+                mitk::ProgressBar::GetInstance()->Progress();
+            
