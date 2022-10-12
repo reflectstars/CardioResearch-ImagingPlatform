@@ -628,4 +628,52 @@ void WallThicknessCalculationsView::MorphologyAnalysis() {
                 filter2->SetTargetReduction(ds);
                 filter2->UpdateLargestPossibleRegion();
                 mitk::ProgressBar::GetInstance()->Progress();
-            
+                mitk::Surface::Pointer shell2 = filter2->GetOutput();
+                vtkSmartPointer<vtkPolyData> pd2 = shell2->GetVtkPolyData();
+                pd2->SetVerts(nullptr);
+                pd2->SetLines(nullptr);
+                vtkSmartPointer<vtkPolyDataConnectivityFilter> connectivityFilter2 = vtkSmartPointer<vtkPolyDataConnectivityFilter>::New();
+                connectivityFilter2->SetInputData(pd2);
+                connectivityFilter2->ColorRegionsOff();
+                connectivityFilter2->SetExtractionModeToLargestRegion();
+                connectivityFilter2->Update();
+                vtkSmartPointer<vtkPolyDataNormals> normals2 = vtkSmartPointer<vtkPolyDataNormals>::New();
+                normals2->AutoOrientNormalsOn();
+                normals2->FlipNormalsOff();
+                normals2->SetInputConnection(connectivityFilter2->GetOutputPort());
+                normals2->Update();
+                shell2->SetVtkPolyData(normals2->GetOutput());
+                mitk::Surface::Pointer surfAP = shell2->Clone();
+                mitk::ProgressBar::GetInstance()->Progress();
+                this->BusyCursorOff();
+                QMessageBox::information(NULL, "Attention", "Operations (Appendage) Finished!");
+
+                //Volume and surface calculations
+                std::unique_ptr<CemrgMeasure> morphAnal = std::unique_ptr<CemrgMeasure>(new CemrgMeasure());
+                double surfceLA = morphAnal->calcSurfaceMesh(surfLA);
+                double volumeLA = morphAnal->calcVolumeMesh(surfLA);
+                double surfceAP = morphAnal->calcSurfaceMesh(surfAP);
+                double volumeAP = morphAnal->calcVolumeMesh(surfAP);
+
+                //Store in text file
+                ofstream morphResult;
+                QString morphPath = directory + "/morphResults.txt";
+                morphResult.open(morphPath.toStdString(), std::ios_base::app);
+                morphResult << "SA" << " " << surfceLA << "\n";
+                morphResult << "VA" << " " << volumeLA << "\n";
+                morphResult << "SP" << " " << surfceAP << "\n";
+                morphResult << "VP" << " " << volumeAP << "\n";
+                morphResult.close();
+
+                //Tidy up data files
+                bool ok;
+                QString morphFile = QInputDialog::getText(NULL, tr("Save As"), tr("File Name:"), QLineEdit::Normal, "morphResults.txt", &ok);
+                if (ok && !morphFile.isEmpty() && morphFile.endsWith(".txt")) {
+                    QString morphNewPath = directory + "/" + morphFile;
+                    int result = rename(morphPath.toStdString().c_str(), morphNewPath.toStdString().c_str());
+                    if (result == 0)
+                        QMessageBox::information(NULL, "Attention", "File name was changed successfully!");
+                    else
+                        QMessageBox::warning(NULL, "Attention", "Wrong file name input. Saved with default name!");
+                } else
+                    QMessageBox::warning(NULL, "Attention", "Wrong fi
