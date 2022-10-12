@@ -676,4 +676,87 @@ void WallThicknessCalculationsView::MorphologyAnalysis() {
                     else
                         QMessageBox::warning(NULL, "Attention", "Wrong file name input. Saved with default name!");
                 } else
-                    QMessageBox::warning(NULL, "Attention", "Wrong fi
+                    QMessageBox::warning(NULL, "Attention", "Wrong file name input. Saved with default name!");
+                inputs->deleteLater();
+
+            } else if (dialogCode == QDialog::Rejected) {
+                inputs->close();
+                inputs->deleteLater();
+                this->GetSite()->GetPage()->ResetPerspective();
+                return;
+            }//_if
+        }//_if
+
+    } catch (...) {
+        QMessageBox::critical(NULL, "Attention", "Cropped segmentation image was not found!");
+        return;
+    }//_try
+}
+
+void WallThicknessCalculationsView::ThicknessAnalysis() {
+
+    //Toggle visibility of buttons
+    if (m_Controls.button_6_1->isVisible()) {
+        m_Controls.button_6_1->setVisible(false);
+        m_Controls.button_6_2->setVisible(false);
+        return;
+    } else {
+        m_Controls.button_6_1->setVisible(true);
+        m_Controls.button_6_2->setVisible(true);
+    }//_if
+}
+
+void WallThicknessCalculationsView::ConvertNRRD() {
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+                    NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                    QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    try {
+
+        bool ok;
+        QString path = directory + "/PVeinsCroppedImage.nii";
+        mitk::Image::Pointer clippedImage = mitk::IOUtil::Load<mitk::Image>(path.toStdString());
+        QString tmpFileName = QInputDialog::getText(NULL, tr("Save Segmentation As"), tr("File Name:"), QLineEdit::Normal, ".nrrd", &ok);
+
+        if (ok && !tmpFileName.isEmpty() && tmpFileName.endsWith(".nrrd") && tmpFileName != ".nrrd") {
+            path = directory + "/" + tmpFileName;
+            mitk::IOUtil::Save(clippedImage, path.toStdString());
+            QMessageBox::information(NULL, "Attention", "Clipped Segmentation was successfully converted!");
+            fileName = tmpFileName;
+        } else {
+            QMessageBox::warning(NULL, "Attention", "Please type a file name with the right extension (i.e. .nrrd)!");
+            return;
+        }//_fileName
+
+    } catch (...) {
+        QMessageBox::critical(NULL, "Attention", "Cropped segmentation image was not found!");
+        return;
+    }//_try
+}
+
+void WallThicknessCalculationsView::Browse() {
+
+    QString para = "";
+    para = QFileDialog::getOpenFileName(
+                NULL, "Open text file containing parameters",
+                directory, QmitkIOUtil::GetFileOpenFilterString());
+    m_Thickness.lineEdit_1->setText(para);
+}
+
+void WallThicknessCalculationsView::ThicknessCalculator() {
+
+    //Ask the user for a dir to store data
+    if (directory.isEmpty()) {
+        directory = QFileDialog::getExistingDirectory(
+                    NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
+                    QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
+        if (directory.isEmpty() || directory.simplified().contain
