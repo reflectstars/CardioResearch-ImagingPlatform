@@ -826,4 +826,83 @@ void WallThicknessCalculationsView::ThicknessCalculator() {
                 m_Thickness.setupUi(inputs);
                 connect(m_Thickness.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
                 connect(m_Thickness.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
-                connect(m_Thickness.pushButton_1, SIGNAL(click
+                connect(m_Thickness.pushButton_1, SIGNAL(clicked()), this, SLOT(Browse()));
+                int dialogCode = inputs->exec();
+
+                //Act on dialog return code
+                if (dialogCode == QDialog::Accepted) {
+
+                    //Checking input files
+                    templatePath = m_Thickness.lineEdit_1->text();
+
+                    //Absolute path
+                    if (templatePath.isEmpty()) {
+                        QString paramFileName = "param-template.par";
+                        QString thicknessCalc = "1";
+                        templatePath = CemrgCommonUtils::M3dlibParamFileGenerator(directory,paramFileName,thicknessCalc);
+                    }//_if
+
+                    //FileName checks
+                    QString meshName = "CGALMesh";
+                    if (fileName.endsWith(".nrrd"))
+                        meshName = fileName.left(fileName.length() - 5);
+
+                    //Run Mesh3DTool
+                    this->BusyCursorOn();
+                    mitk::ProgressBar::GetInstance()->AddStepsToDo(1);
+                    std::unique_ptr<CemrgCommandLine> cmd(new CemrgCommandLine());
+                    cmd->ExecuteCreateCGALMesh(directory, meshName, templatePath);
+                    QMessageBox::information(NULL, "Attention", "Command Line Operations Finished!");
+                    mitk::ProgressBar::GetInstance()->Progress();
+                    this->BusyCursorOff();
+
+                } else if (dialogCode == QDialog::Rejected) {
+                    inputs->close();
+                    inputs->deleteLater();
+                }//_if
+
+            } catch(mitk::Exception&) {
+                return;
+            }//_try
+        } else
+            return;
+    } else
+        return;
+}
+
+void WallThicknessCalculationsView::Reset() {
+
+    try {
+
+        ctkPluginContext* context = mitk::kcl_cemrgapp_wathca_Activator::getContext();
+        mitk::IDataStorageService* dss = 0;
+        ctkServiceReference dsRef = context->getServiceReference<mitk::IDataStorageService>();
+
+        if (dsRef)
+            dss = context->getService<mitk::IDataStorageService>(dsRef);
+
+        if (!dss) {
+            MITK_WARN << "IDataStorageService service not available. Unable to close project.";
+            context->ungetService(dsRef);
+            return;
+        }
+
+        mitk::IDataStorageReference::Pointer dataStorageRef = dss->GetActiveDataStorage();
+        if (dataStorageRef.IsNull()) {
+            //No active data storage set (i.e. not editor with a DataStorageEditorInput is active).
+            dataStorageRef = dss->GetDefaultDataStorage();
+        }
+
+        mitk::DataStorage::Pointer dataStorage = dataStorageRef->GetDataStorage();
+        if (dataStorage.IsNull()) {
+            MITK_WARN << "No data storage available. Cannot close project.";
+            return;
+        }
+
+        //Check if we got the default datastorage and if there is anything else then helper object in the storage
+        if (dataStorageRef->IsDefault() && dataStorage->GetSubset(
+                    mitk::NodePredicateNot::New(
+                        mitk::NodePredicateProperty::New("helper object", mitk::BoolProperty::New(true))))->empty())
+            return;
+
+        //Remove every
