@@ -759,4 +759,71 @@ void WallThicknessCalculationsView::ThicknessCalculator() {
         directory = QFileDialog::getExistingDirectory(
                     NULL, "Open Project Directory", mitk::IOUtil::GetProgramPath().c_str(),
                     QFileDialog::ShowDirsOnly|QFileDialog::DontUseNativeDialog);
-        if (directory.isEmpty() || directory.simplified().contain
+        if (directory.isEmpty() || directory.simplified().contains(" ")) {
+            QMessageBox::warning(NULL, "Attention", "Please select a project directory with no spaces in the path!");
+            directory = QString();
+            return;
+        }//_if
+    }
+
+    //Check for selection of images
+    QList<mitk::DataNode::Pointer> nodes = this->GetDataManagerSelection();
+    if (nodes.empty()) {
+        QMessageBox::warning(
+                    NULL, "Attention",
+                    "Please select a segmentation from the Data Manager to calculate wall thickness!");
+        return;
+    }
+
+    //Find the selected node
+    QString templatePath;
+    mitk::Point3D origin;
+    mitk::DataNode::Pointer segNode = nodes.at(0);
+    mitk::BaseData::Pointer data = segNode->GetData();
+    if (data) {
+
+        //Test if this data item is an image
+        mitk::Image::Pointer image = dynamic_cast<mitk::Image*>(data.GetPointer());
+        if (image) {
+
+            origin = image->GetGeometry()->GetOrigin();
+            int dimensions = image->GetDimension(0)*image->GetDimension(1)*image->GetDimension(2);
+
+            try {
+
+                //Convert image to right type
+                itk::Image<uint8_t,3>::Pointer itkImage = itk::Image<uint8_t,3>::New();
+                mitk::CastToItkImage(image, itkImage);
+                mitk::CastToMitkImage(itkImage, image);
+
+                //Access image volume
+                mitk::ImagePixelReadAccessor<uint8_t,3> readAccess(image);
+                uint8_t* pv = (uint8_t*)readAccess.GetData();
+
+                //Prepare header of inr file (BUGS IN RELEASE MODE DUE TO NULL TERMINATOR \0)
+                char header[256] = {};
+                int bitlength = 8;
+                const char* btype = "unsigned fixed";
+                mitk::Vector3D spacing = image->GetGeometry()->GetSpacing();
+                int n = sprintf(header, "#INRIMAGE-4#{\nXDIM=%d\nYDIM=%d\nZDIM=%d\nVDIM=1\nTYPE=%s\nPIXSIZE=%d bits\nCPU=decm\nVX=%6.4f\nVY=%6.4f\nVZ=%6.4f\n", image->GetDimension(0), image->GetDimension(1), image->GetDimension(2), btype, bitlength, spacing.GetElement(0), spacing.GetElement(1), spacing.GetElement(2));
+                for (int i = n; i < 252; i++)
+                    header[i] = '\n';
+
+                header[252] = '#';
+                header[253] = '#';
+                header[254] = '}';
+                header[255] = '\n';
+
+                //Write to binary file
+                std::string path = (directory + "/converted.inr").toStdString();
+                ofstream myFile(path, ios::out | ios::binary);
+                myFile.write((char*)header, 256 * sizeof(char));
+                myFile.write((char*)pv, dimensions * sizeof(uint8_t));
+                myFile.close();
+
+                //Ask for user input to set the parameters
+                QDialog* inputs = new QDialog(0,0);
+                m_Thickness.setupUi(inputs);
+                connect(m_Thickness.buttonBox, SIGNAL(accepted()), inputs, SLOT(accept()));
+                connect(m_Thickness.buttonBox, SIGNAL(rejected()), inputs, SLOT(reject()));
+                connect(m_Thickness.pushButton_1, SIGNAL(click
