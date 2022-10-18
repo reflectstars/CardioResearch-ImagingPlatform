@@ -53,4 +53,52 @@ PURPOSE.  See the above copyright notices for more information.
 class WallThicknessCalculationsView: public QmitkAbstractView {
 
     // this is needed for all Qt objects that should have a Qt meta-object
-    // (everything that derives from QObject 
+    // (everything that derives from QObject and wants to have signal/slots)
+    Q_OBJECT
+
+public:
+
+    static const std::string VIEW_ID;
+    WallThicknessCalculationsView();
+
+protected slots:
+
+    /// \brief Called when the user clicks the GUI button
+    void LoadDICOM();
+    void ProcessIMGS();
+    void ConvertNII();
+    void CropIMGS();
+    void ResampIMGS();
+    void ApplyFilter();
+    void SegmentIMGS();
+    void SelectROI();
+    void SelectLandmarks();
+    void CombineSegs();
+    void ClipperPV();
+    void MorphologyAnalysis();
+    void ThicknessAnalysis();
+    void ConvertNRRD();
+    void Browse();
+    void ThicknessCalculator();
+    void Reset();
+
+protected:
+
+    virtual void CreateQtPartControl(QWidget *parent) override;
+    virtual void SetFocus() override;
+    /// \brief called by QmitkFunctionality when DataManager's selection has changed
+    virtual void OnSelectionChanged(berry::IWorkbenchPart::Pointer source, const QList<mitk::DataNode::Pointer>& nodes) override;
+
+    Ui::WallThicknessCalculationsViewControls m_Controls;
+    Ui::WallThicknessCalculationsViewUIMeshing m_UIMeshing;
+    Ui::WallThicknessCalculationsViewUIThickness m_Thickness;
+
+private:
+
+    QString fileName;
+    QString directory;
+    const int APPENDAGECUT = 19;
+    const int APPENDAGEUNCUT = 20;
+};
+
+#endif // WallThicknessCalculationsView_h
