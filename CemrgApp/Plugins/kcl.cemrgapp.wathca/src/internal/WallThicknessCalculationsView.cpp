@@ -905,4 +905,31 @@ void WallThicknessCalculationsView::Reset() {
                         mitk::NodePredicateProperty::New("helper object", mitk::BoolProperty::New(true))))->empty())
             return;
 
-        //Remove every
+        //Remove everything
+        mitk::DataStorage::SetOfObjects::ConstPointer nodesToRemove = dataStorage->GetAll();
+        dataStorage->Remove(nodesToRemove);
+
+        //Remove the datastorage from the data storage service
+        dss->RemoveDataStorageReference(dataStorageRef);
+
+        //Close all editors with this data storage as input
+        mitk::DataStorageEditorInput::Pointer dsInput(new mitk::DataStorageEditorInput(dataStorageRef));
+        QList<berry::IEditorReference::Pointer> dsEditors =
+                this->GetSite()->GetPage()->FindEditors(dsInput, QString(), berry::IWorkbenchPage::MATCH_INPUT);
+
+        if (!dsEditors.empty()) {
+            QList<berry::IEditorReference::Pointer> editorsToClose = dsEditors;
+            this->GetSite()->GetPage()->CloseEditors(editorsToClose, false);
+        }
+
+    } catch (std::exception& e) {
+
+        MITK_ERROR << "Exception caught during closing project: " << e.what();
+        QMessageBox::warning(NULL, "Error", QString("An error occurred during Close Project: %1").arg(e.what()));
+    }//_try
+
+    //Clear project directory
+    directory.clear();
+    m_Controls.button_2_2->setText("Crop Images");
+    this->GetSite()->GetPage()->ResetPerspective();
+}
